@@ -1,0 +1,68 @@
+{
+  "name": "@madeonsol/plugin-robinhood-chain",
+  "version": "0.1.0",
+  "description": "ElizaOS plugin for Robinhood Chain (chain id 4663) — EVM-native KOL trade intelligence, token discovery & bundle detection, deployer reputation, and the DEX trade tape from a self-hosted RHC node",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/madeonsol/plugin-robinhood-chain.git"
+  },
+  "homepage": "https://madeonsol.com/robinhood",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "prebuild": "node ../gen-version.mjs",
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "preflight": "bash ../../scripts/preflight-publish.sh",
+    "prepublishOnly": "npm run preflight && npm run build"
+  },
+  "peerDependencies": {
+    "@elizaos/core": ">=1.0.0"
+  },
+  "agentConfig": {
+    "pluginType": "elizaos:plugin:1.0.0",
+    "pluginParameters": {
+      "ROBINHOOD_CHAIN_API_URL": {
+        "type": "string",
+        "description": "MadeOnSol API base URL (Robinhood Chain endpoints live under /api/v1/rhc)",
+        "required": false,
+        "default": "https://madeonsol.com"
+      },
+      "ROBINHOOD_CHAIN_API_KEY": {
+        "type": "string",
+        "description": "MadeOnSol API key (msk_...) — the same key covers Robinhood Chain at no extra cost. Get a free one at https://madeonsol.com/developer. Falls back to MADEONSOL_API_KEY.",
+        "required": true,
+        "sensitive": true
+      }
+    }
+  },
+  "keywords": [
+    "robinhood-chain",
+    "robinhood",
+    "rhc",
+    "chain-4663",
+    "elizaos",
+    "eliza",
+    "eliza-plugin",
+    "elizaos-plugin",
+    "ai-agent",
+    "evm",
+    "kol",
+    "kol-tracker",
+    "deployer-hunter",
+    "smart-money",
+    "memecoin",
+    "trading",
+    "madeonsol"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@elizaos/core": "^2.0.0-alpha.77"
+  }
+}
