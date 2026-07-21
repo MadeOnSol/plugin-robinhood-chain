@@ -5,11 +5,13 @@
 [![ElizaOS](https://img.shields.io/badge/ElizaOS-plugin-blueviolet?style=flat-square)](https://github.com/elizaOS/eliza)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
-> 🤖 **[Robinhood Chain API](https://madeonsol.com/robinhood)** · 📚 **[API docs](https://madeonsol.com/api-docs)** · 💰 **[Free API key](https://madeonsol.com/developer)** · 🤖 **[ElizaOS](https://github.com/elizaOS/eliza)**
+> 🤖 **[Robinhood Chain API](https://madeonsol.com/robinhood)** · 📚 **[API docs](https://madeonsol.com/api-docs)** · 💰 **[Free API key](https://madeonsol.com/pricing)** · 🤖 **[ElizaOS](https://github.com/elizaOS/eliza)**
 
 **ElizaOS plugin for the Robinhood Chain API** — EVM-native, on-chain trading intelligence for **Robinhood Chain (chain id 4663)**. Give your ElizaOS agent live KOL trades, token discovery, launch-bundle detection, buyer-quality scoring, deployer reputation, the DEX trade tape, and smart-money wallet rankings — all from [MadeOnSol](https://madeonsol.com)'s self-hosted RHC node.
 
-> Robinhood Chain intelligence, EVM-native: track Solana KOLs' verified RHC wallets (recovered by tracing their Solana→EVM bridge deposits — a dataset unique to MadeOnSol), rank 40k+ RHC deployers by graduation/runner rate, detect same-block launch bundles and score early-buyer cohorts, and stream the Uniswap v2/v3/v4 trade tape with the real trader EOA. Every field is EVM-native — `token_address` (lowercase `0x`), `eth_amount`, `tx_hash`, `block_number`, `net_flow_eth`. **Same `msk_` API key, same base URL, bundled into every tier at no extra cost.** Get a free key at [madeonsol.com/developer](https://madeonsol.com/developer).
+> Robinhood Chain intelligence, EVM-native: track Solana KOLs' verified RHC wallets (recovered by tracing their Solana→EVM bridge deposits — a dataset unique to MadeOnSol), rank 40k+ RHC deployers by graduation/runner rate, detect same-block launch bundles and score early-buyer cohorts, and stream the Uniswap v2/v3/v4 trade tape with the real trader EOA. Every field is EVM-native — `token_address` (lowercase `0x`), `eth_amount`, `tx_hash`, `block_number`, `net_flow_eth`. **Same `msk_` API key, same base URL, bundled into every tier at no extra cost.** Get a free key at [madeonsol.com/pricing](https://madeonsol.com/pricing).
+
+New customers get a **5-day free trial** of Pro or Ultra when you pay by card — full access, nothing charged during the trial, cancel anytime. Start at [madeonsol.com/pricing](https://madeonsol.com/pricing).
 
 ## Quick start (10 seconds)
 
@@ -21,7 +23,7 @@ npm install @madeonsol/plugin-robinhood-chain
 import { robinhoodChainPlugin } from "@madeonsol/plugin-robinhood-chain";
 const agent = {
   plugins: [robinhoodChainPlugin],
-  settings: { ROBINHOOD_CHAIN_API_KEY: "msk_..." }, // free key at https://madeonsol.com/developer
+  settings: { ROBINHOOD_CHAIN_API_KEY: "msk_..." }, // free key at https://madeonsol.com/pricing
 };
 // Then ask the agent: "What are KOLs buying on Robinhood Chain right now?"
 ```
@@ -32,7 +34,7 @@ Robinhood Chain is **key-mode only** — a single MadeOnSol API key (`msk_`, Bea
 
 | Setting | Notes |
 |---|---|
-| `ROBINHOOD_CHAIN_API_KEY` | Your `msk_` key. [Get a free one](https://madeonsol.com/developer) — the same key already covers the Solana API. |
+| `ROBINHOOD_CHAIN_API_KEY` | Your `msk_` key. [Get a free one](https://madeonsol.com/pricing) — the same key already covers the Solana API. |
 | `MADEONSOL_API_KEY` | Fallback — used if `ROBINHOOD_CHAIN_API_KEY` is unset. |
 | `ROBINHOOD_CHAIN_API_URL` | Optional base URL. Default `https://madeonsol.com`. |
 
@@ -65,7 +67,7 @@ import { robinhoodChainPlugin } from "@madeonsol/plugin-robinhood-chain";
 const agent = {
   plugins: [robinhoodChainPlugin],
   settings: {
-    ROBINHOOD_CHAIN_API_KEY: "msk_your_api_key_here", // free at madeonsol.com/developer
+    ROBINHOOD_CHAIN_API_KEY: "msk_your_api_key_here", // free at madeonsol.com/pricing
   },
 };
 ```
@@ -120,7 +122,7 @@ Robinhood Chain is an Arbitrum Orbit L2 (chain id 4663). Two things follow from 
 | PRO | €43/mo (€430/yr) ≈ $49 | 10,000 |
 | ULTRA | €131/mo (€1310/yr) ≈ $149 | 100,000 |
 
-Robinhood Chain coverage is bundled into every tier at no extra cost. BASIC endpoints work with any valid key; `GET /rhc/trades`, `GET /rhc/tokens`, `GET /rhc/tokens/{address}/candles`, `GET /rhc/tokens/{address}/kol-consensus`, and `GET /rhc/alpha-wallets` require PRO+. ULTRA unlocks the deepest fields (e.g. the full bundle cohort with wallet identity, and the KOL-consensus `buyers`/`exited` lists). Get a key at [madeonsol.com/developer](https://madeonsol.com/developer) · pricing at [madeonsol.com/pricing](https://madeonsol.com/pricing).
+Robinhood Chain coverage is bundled into every tier at no extra cost. BASIC endpoints work with any valid key; `GET /rhc/trades`, `GET /rhc/tokens`, `GET /rhc/tokens/{address}/candles`, `GET /rhc/tokens/{address}/kol-consensus`, and `GET /rhc/alpha-wallets` require PRO+. ULTRA unlocks the deepest fields (e.g. the full bundle cohort with wallet identity, and the KOL-consensus `buyers`/`exited` lists). Get a key at [madeonsol.com/pricing](https://madeonsol.com/pricing) · pricing at [madeonsol.com/pricing](https://madeonsol.com/pricing).
 
 ## Also Available
 
@@ -136,7 +138,7 @@ Robinhood Chain coverage is bundled into every tier at no extra cost. BASIC endp
 
 - **Robinhood Chain product** → https://madeonsol.com/robinhood
 - **API docs** → https://madeonsol.com/api-docs
-- **Free API key** → https://madeonsol.com/developer
+- **Free API key** → https://madeonsol.com/pricing
 - **Pricing** → https://madeonsol.com/pricing
 
 ## License
