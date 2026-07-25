@@ -7,7 +7,7 @@ function getClient(runtime: IAgentRuntime): RobinhoodChainClient {
   return ((runtime as unknown as Record<string, unknown>)[RHC_CLIENT_KEY] as RobinhoodChainClient) ?? new RobinhoodChainClient();
 }
 
-const AUTH_HINT = "Authentication required. Set ROBINHOOD_CHAIN_API_KEY (or MADEONSOL_API_KEY) — get a free `msk_` key at https://madeonsol.com/developer.";
+const AUTH_HINT = "Authentication required. Set ROBINHOOD_CHAIN_API_KEY (or MADEONSOL_API_KEY) — get a free `msk_` key at https://madeonsol.com/pricing.";
 const EVM_RE = /\b(0x[0-9a-fA-F]{40})\b/;
 
 export const rhcTokenCandlesAction: Action = {

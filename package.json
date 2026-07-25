@@ -1,6 +1,6 @@
 {
   "name": "@madeonsol/plugin-robinhood-chain",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "ElizaOS plugin for Robinhood Chain (chain id 4663) — EVM-native KOL trade intelligence, token discovery & bundle detection, deployer reputation, and the DEX trade tape from a self-hosted RHC node",
   "repository": {
     "type": "git",
@@ -36,7 +36,7 @@
       },
       "ROBINHOOD_CHAIN_API_KEY": {
         "type": "string",
-        "description": "MadeOnSol API key (msk_...) — the same key covers Robinhood Chain at no extra cost. Get a free one at https://madeonsol.com/developer. Falls back to MADEONSOL_API_KEY.",
+        "description": "MadeOnSol API key (msk_...) — the same key covers Robinhood Chain at no extra cost. Get a free one at https://madeonsol.com/pricing. Falls back to MADEONSOL_API_KEY.",
         "required": true,
         "sensitive": true
       }
