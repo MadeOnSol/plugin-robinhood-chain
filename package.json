@@ -1,6 +1,6 @@
 {
   "name": "@madeonsol/plugin-robinhood-chain",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "ElizaOS plugin for Robinhood Chain (chain id 4663) — EVM-native KOL trade intelligence, token discovery & bundle detection, deployer reputation, and the DEX trade tape from a self-hosted RHC node",
   "repository": {
     "type": "git",
