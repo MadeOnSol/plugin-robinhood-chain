@@ -945,6 +945,74 @@ export class RobinhoodChainClient {
   }
 
   /**
+   * Top traders of one token, ranked by REALIZED ETH flow (sell − buy), with
+   * wallet reputation, dump-cluster membership and early-buyer rank.
+   * `net_eth` is NOT PnL — it ignores a trader's remaining bag, so a wallet that
+   * bought and still holds ranks last (PRO+). GET /rhc/tokens/{address}/top-traders
+   */
+  getTokenTopTraders(address: string, params: { limit?: number; offset?: number } = {}) {
+    return this.restRequest<unknown>(
+      "GET",
+      `/rhc/tokens/${encodeURIComponent(address)}/top-traders`,
+      params,
+    );
+  }
+
+  /**
+   * Net buy/sell flow by mutually-exclusive trader cohort. `net_eth = sell − buy`,
+   * so POSITIVE means the cohort distributed (PRO+). GET /rhc/tokens/{address}/flow
+   */
+  getTokenFlow(address: string, window?: "1h" | "6h" | "24h" | "7d") {
+    return this.restRequest<unknown>(
+      "GET",
+      `/rhc/tokens/${encodeURIComponent(address)}/flow`,
+      { window },
+    );
+  }
+
+  /**
+   * Peak MC, drawdown and high-water curve. Returns BOTH the stored
+   * `peak_mc_usd_recorded` (what deployer tiering keys off, sampled from write
+   * batches so it can undercount) and `peak_mc_usd_observed` (candle max,
+   * trade-level truth, always >= recorded) (PRO+). GET /rhc/tokens/{address}/peak-history
+   */
+  getTokenPeakHistory(
+    address: string,
+    params: { window?: "24h" | "7d" | "30d" | "all"; curve?: "true" | "false" } = {},
+  ) {
+    return this.restRequest<unknown>(
+      "GET",
+      `/rhc/tokens/${encodeURIComponent(address)}/peak-history`,
+      params,
+    );
+  }
+
+  /**
+   * EVM-native risk computed LIVE on-chain. Not the Solana model — EVM has no
+   * mint/freeze authority and only ~2% of RHC tokens expose an owner function, so
+   * an absent flag is the norm, not a safety signal. The load-bearing field is
+   * `sellability.sellable`, simulated at head and never cached (PRO+).
+   * GET /rhc/tokens/{address}/risk
+   */
+  getTokenRisk(address: string) {
+    return this.restRequest<unknown>("GET", `/rhc/tokens/${encodeURIComponent(address)}/risk`);
+  }
+
+  /**
+   * Exact holder set + concentration from ERC-20 Transfer-log replay, reconciled
+   * against on-chain totalSupply(). Check `verified` before relying on it.
+   * Concentration excludes pools and burns; `balance` is a uint256 decimal string
+   * (PRO+). GET /rhc/tokens/{address}/holders
+   */
+  getTokenHolders(address: string, params: { limit?: number; offset?: number } = {}) {
+    return this.restRequest<unknown>(
+      "GET",
+      `/rhc/tokens/${encodeURIComponent(address)}/holders`,
+      params,
+    );
+  }
+
+  /**
    * Up to 50 RHC tokens in ONE call — metadata, price/MC/FDV/liquidity, peak MC, and
    * deployer reputation. Set-based (3 queries total), not a fan-out. Unknown addresses
    * come back as `found:false` so the array stays positional (BASIC+).
