@@ -13,7 +13,7 @@ const EVM_RE = /\b(0x[0-9a-fA-F]{40})\b/;
 export const rhcTradesAction: Action = {
   name: "GET_RHC_TRADES",
   description:
-    "Get the Robinhood Chain DEX trade tape — every Uniswap v2/v3/v4 swap on chain 4663, each row carrying the real trader wallet (trader_eoa = tx.from, not the router), gas/ordering for MEV analysis, pool state, and KOL/deployer flags. Filter by token, dex, action, min_eth. PRO+.",
+    "Get the Robinhood Chain DEX trade tape — every Uniswap v2/v3/v4 swap on chain 4663, each row carrying the effective trading account (trader_eoa — tx.from normally, or the ERC-4337 userOp sender when the trade was bundled; never the router or the bundler), gas/ordering for MEV analysis, pool state, and KOL/deployer flags. Filter by token, dex, action, min_eth. PRO+.",
   similes: [
     "robinhood chain trades",
     "rhc dex trade tape",

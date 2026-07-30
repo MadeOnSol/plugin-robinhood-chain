@@ -212,7 +212,7 @@ export interface RhcKolFirstTouchesResponse {
   data_age_seconds: number | null;
 }
 
-/** One row of the RHC DEX trade tape. `trader_eoa` is the authoritative wallet. */
+/** One row of the RHC DEX trade tape. `trader_eoa` is the effective trading account — `tx.from`, or the ERC-4337 userOp sender when bundled. */
 export interface RhcTrade {
   block_number: number;
   block_time: string;
@@ -881,7 +881,7 @@ export class RobinhoodChainClient {
 
   // ── Trades ──
 
-  /** RHC DEX trade tape with real trader EOA + MEV fields (PRO+). GET /rhc/trades */
+  /** RHC DEX trade tape with the effective trader EOA + MEV fields (PRO+). GET /rhc/trades */
   getTrades(params?: {
     limit?: number;
     token?: string;
