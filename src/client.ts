@@ -743,8 +743,223 @@ export interface RhcAlphaWalletsResponse {
   has_more: boolean;
 }
 
+// ── Rule engine (copy-trade, price alerts, coordination, first touches) ──
+//
+// These are the only WRITE surfaces on Robinhood Chain — they create server-side
+// rules, they do not execute anything on-chain. Every quota below is PER CHAIN:
+// a full set of Solana rules does not consume RHC capacity, and vice versa.
+
+/** `{ chain, deleted: true }` — the shape every rule DELETE returns. */
+export interface RhcDeletedResponse {
+  chain: "robinhood";
+  deleted: true;
+}
+
 /**
- * Robinhood Chain client. All 25 RHC endpoints, EVM-native, Bearer `msk_` auth.
+ * One RHC copy-trade rule. Amounts are ETH (`min_trade_eth` / `sizing_amount`),
+ * not SOL. There is deliberately NO market-cap band on RHC copy-trade — the
+ * producer's notify payload carries no market cap, so a band could only be a
+ * per-event lookup in the hot path of a ~3.3M trades/day chain.
+ */
+export interface RhcCopytradeSubscription {
+  id: number;
+  name: string | null;
+  /** Lowercased on write — the evaluator matches lowercased event addresses. */
+  source_wallets: string[];
+  min_trade_eth: number;
+  only_action: "buy" | "sell" | "both";
+  sizing_mode: "fixed" | "proportional" | "percent_source";
+  sizing_amount: number;
+  delivery_mode: "webhook" | "websocket" | "both";
+  webhook_url: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RhcCopytradeSubscriptionsResponse {
+  chain: "robinhood";
+  subscriptions: RhcCopytradeSubscription[];
+}
+
+export interface RhcCopytradeSubscriptionResponse {
+  chain: "robinhood";
+  subscription: RhcCopytradeSubscription;
+}
+
+/** Create response — `webhook_secret` is returned ONCE and never again. */
+export interface RhcCopytradeSubscriptionCreatedResponse extends RhcCopytradeSubscriptionResponse {
+  /** null when delivery_mode is `websocket`. Store it — it is not retrievable later. */
+  webhook_secret: string | null;
+  note: string;
+}
+
+/** One fired copy-trade signal. `suggested_eth_amount` is sizing output, not an order. */
+export interface RhcCopytradeSignal {
+  id: number;
+  subscription_id: number;
+  fired_at: string;
+  source_wallet: string;
+  action: "buy" | "sell";
+  token_address: string;
+  token_symbol: string | null;
+  token_name: string | null;
+  source_eth_amount: number | null;
+  suggested_eth_amount: number | null;
+  price_usd: number | null;
+  dex: string | null;
+  tx_hash: string;
+  delivered: boolean;
+  delivered_at: string | null;
+}
+
+export interface RhcCopytradeSignalsResponse {
+  chain: "robinhood";
+  signals: RhcCopytradeSignal[];
+  count: number;
+}
+
+/** One RHC price alert. Market-cap denominated — `baseline_mc_usd` is captured at create time. */
+export interface RhcPriceAlert {
+  id: number;
+  name: string | null;
+  token_address: string;
+  token_symbol: string | null;
+  baseline_mc_usd: number;
+  drop_pct: number;
+  recovery_pct: number | null;
+  status: "watching" | "dipped" | "recovered" | "expired";
+  dip_low_mc_usd: number | null;
+  dip_fired_at: string | null;
+  delivery_mode: "webhook" | "websocket" | "both";
+  webhook_url: string | null;
+  is_active: boolean;
+  /** Alerts expire 30 days after creation. */
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RhcPriceAlertsResponse {
+  chain: "robinhood";
+  alerts: RhcPriceAlert[];
+}
+
+export interface RhcPriceAlertResponse {
+  chain: "robinhood";
+  alert: RhcPriceAlert;
+}
+
+export interface RhcPriceAlertCreatedResponse extends RhcPriceAlertResponse {
+  /** null when delivery_mode is `websocket`. Shown once. */
+  webhook_secret: string | null;
+  /** RHC alerts are POLLED (~15s), NOT sub-second like the Solana alerts. */
+  evaluation: { mode: "polled"; interval_seconds: number; note: string };
+  note: string;
+}
+
+export interface RhcPriceAlertEvent {
+  id: number;
+  alert_id: number;
+  event_type: "dip" | "recovery";
+  fired_at: string;
+  token_address: string;
+  baseline_mc_usd: number;
+  current_mc_usd: number;
+  drop_pct_actual: number | null;
+  dip_low_mc_usd: number | null;
+  recovery_pct_actual: number | null;
+  delivered: boolean;
+  delivered_at: string | null;
+}
+
+export interface RhcPriceAlertEventsResponse {
+  chain: "robinhood";
+  events: RhcPriceAlertEvent[];
+  count: number;
+}
+
+/** One RHC coordination alert rule — fires when N+ tracked KOLs buy the same token in a window. */
+export interface RhcCoordinationAlertRule {
+  /** UUID. */
+  id: string;
+  name: string | null;
+  min_kols: number;
+  window_minutes: number;
+  min_score: number;
+  cooldown_min: number;
+  score_jump_break: number;
+  min_mc_usd: number | null;
+  max_mc_usd: number | null;
+  delivery_mode: "websocket" | "webhook" | "both";
+  webhook_url: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RhcCoordinationAlertRulesResponse {
+  chain: "robinhood";
+  rules: RhcCoordinationAlertRule[];
+}
+
+export interface RhcCoordinationAlertRuleResponse {
+  chain: "robinhood";
+  rule: RhcCoordinationAlertRule;
+}
+
+export interface RhcCoordinationAlertRuleCreatedResponse extends RhcCoordinationAlertRuleResponse {
+  webhook_secret: string | null;
+  /** States which score components are real on RHC — `earliness` is defaulted. */
+  scoring: { score_version: string; quality: string; earliness: string; note: string };
+  note: string;
+}
+
+/**
+ * First-touch subscription filters. RHC deliberately omits Solana's
+ * `min_scout_tier` / `min_n_touches` (no mv_kol_scout_score on this chain) and
+ * offers KOL win-rate + strategy instead. Unknown keys are REJECTED, not ignored.
+ */
+export interface RhcFirstTouchFilters {
+  /** Single KOL EVM address — lowercased on write. */
+  kol?: string;
+  min_first_buy_eth?: number;
+  /** 0–1, from mv_rhc_kol_scores. */
+  min_kol_winrate?: number;
+  strategy?: "scalper" | "day_trader" | "swing" | "inactive" | "unscored";
+  min_mc_usd?: number;
+  max_mc_usd?: number;
+}
+
+export interface RhcFirstTouchSubscription {
+  /** UUID. */
+  id: string;
+  name: string | null;
+  filters: RhcFirstTouchFilters;
+  delivery_mode: "websocket" | "webhook" | "both";
+  webhook_url: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RhcFirstTouchSubscriptionsResponse {
+  chain: "robinhood";
+  subscriptions: RhcFirstTouchSubscription[];
+}
+
+export interface RhcFirstTouchSubscriptionResponse {
+  chain: "robinhood";
+  subscription: RhcFirstTouchSubscription;
+}
+
+export interface RhcFirstTouchSubscriptionCreatedResponse extends RhcFirstTouchSubscriptionResponse {
+  webhook_secret: string | null;
+  note: string;
+}
+
+/**
+ * Robinhood Chain client. All 52 RHC endpoints, EVM-native, Bearer `msk_` auth.
  */
 export class RobinhoodChainClient {
   private baseUrl: string;
@@ -1203,5 +1418,337 @@ export class RobinhoodChainClient {
     offset?: number;
   }) {
     return this.restRequest<RhcAlphaWalletsResponse>("GET", "/rhc/alpha-wallets", params);
+  }
+
+  // ── Copy-trade rules (PRO+) ──
+  //
+  // Rules are DATA, not execution: a fired rule delivers a suggested size, it
+  // never places an order. Quotas (rules and source wallets per rule) are
+  // per-chain — Solana copy-trade rules do not consume RHC capacity.
+
+  /** List your RHC copy-trade rules (PRO+). GET /rhc/copytrade/subscriptions */
+  getCopytradeSubscriptions() {
+    return this.restRequest<RhcCopytradeSubscriptionsResponse>("GET", "/rhc/copytrade/subscriptions");
+  }
+
+  /**
+   * Create an RHC copy-trade rule (PRO+). `sizing_amount` and `min_trade_eth` are
+   * ETH. No market-cap band exists on RHC copy-trade. `webhook_url` is required
+   * unless `delivery_mode` is `websocket`, and the returned `webhook_secret` is
+   * shown ONCE. POST /rhc/copytrade/subscriptions
+   */
+  createCopytradeSubscription(input: {
+    name?: string;
+    /** 1–250 EVM addresses; the per-tier cap is enforced server-side. */
+    source_wallets: string[];
+    min_trade_eth?: number;
+    only_action?: "buy" | "sell" | "both";
+    sizing_mode?: "fixed" | "proportional" | "percent_source";
+    sizing_amount: number;
+    delivery_mode?: "webhook" | "websocket" | "both";
+    webhook_url?: string;
+  }) {
+    return this.restRequest<RhcCopytradeSubscriptionCreatedResponse>(
+      "POST",
+      "/rhc/copytrade/subscriptions",
+      undefined,
+      input,
+    );
+  }
+
+  /** One copy-trade rule by numeric id (PRO+). GET /rhc/copytrade/subscriptions/{id} */
+  getCopytradeSubscription(id: number) {
+    return this.restRequest<RhcCopytradeSubscriptionResponse>(
+      "GET",
+      `/rhc/copytrade/subscriptions/${id}`,
+    );
+  }
+
+  /**
+   * Update a copy-trade rule (PRO+). Partial — send only what changes. The wallet
+   * cap is re-checked, so a rule cannot be PATCHed past its tier.
+   * PATCH /rhc/copytrade/subscriptions/{id}
+   */
+  updateCopytradeSubscription(
+    id: number,
+    updates: {
+      name?: string | null;
+      source_wallets?: string[];
+      min_trade_eth?: number;
+      only_action?: "buy" | "sell" | "both";
+      sizing_mode?: "fixed" | "proportional" | "percent_source";
+      sizing_amount?: number;
+      delivery_mode?: "webhook" | "websocket" | "both";
+      webhook_url?: string | null;
+      is_active?: boolean;
+    },
+  ) {
+    return this.restRequest<RhcCopytradeSubscriptionResponse>(
+      "PATCH",
+      `/rhc/copytrade/subscriptions/${id}`,
+      undefined,
+      updates,
+    );
+  }
+
+  /** Delete a copy-trade rule (PRO+). DELETE /rhc/copytrade/subscriptions/{id} */
+  deleteCopytradeSubscription(id: number) {
+    return this.restRequest<RhcDeletedResponse>("DELETE", `/rhc/copytrade/subscriptions/${id}`);
+  }
+
+  /**
+   * Fire history for your copy-trade rules — the catch-up path after a missed
+   * webhook or a dropped WS connection. Retained 7 days (PRO+).
+   * GET /rhc/copytrade/signals
+   */
+  getCopytradeSignals(params?: {
+    /** 1–500, default 50. */
+    limit?: number;
+    /** Restrict to one rule you own. */
+    subscription_id?: number;
+    /** ISO 8601 — only signals fired at or after this instant. */
+    since?: string;
+  }) {
+    return this.restRequest<RhcCopytradeSignalsResponse>("GET", "/rhc/copytrade/signals", params);
+  }
+
+  // ── Price alerts (PRO+) ──
+
+  /** List your RHC price alerts (PRO+). GET /rhc/price-alerts */
+  getPriceAlerts() {
+    return this.restRequest<RhcPriceAlertsResponse>("GET", "/rhc/price-alerts");
+  }
+
+  /**
+   * Create an RHC price alert (PRO+). The baseline market cap is captured NOW, so
+   * the alert is a delta from the moment you set it; the token must already be
+   * tracked with a market cap or the call 400s.
+   *
+   * RHC alerts are evaluated on a ~15s POLL of `rhc_token_prices`, not a live
+   * price loop — effective latency is that interval plus the token's own
+   * price-update cadence. This is NOT parity with the sub-second Solana alerts.
+   * POST /rhc/price-alerts
+   */
+  createPriceAlert(input: {
+    name?: string;
+    /** EVM token address (0x, 40 hex). */
+    token_address: string;
+    /** Percent drop from the captured baseline MC, 0.01–99.99. */
+    drop_pct: number;
+    /** Optional second leg — percent recovery from the dip low, 0.01–1000. */
+    recovery_pct?: number;
+    delivery_mode?: "webhook" | "websocket" | "both";
+    webhook_url?: string;
+  }) {
+    return this.restRequest<RhcPriceAlertCreatedResponse>(
+      "POST",
+      "/rhc/price-alerts",
+      undefined,
+      input,
+    );
+  }
+
+  /** One price alert by numeric id (PRO+). GET /rhc/price-alerts/{id} */
+  getPriceAlert(id: number) {
+    return this.restRequest<RhcPriceAlertResponse>("GET", `/rhc/price-alerts/${id}`);
+  }
+
+  /**
+   * Update a price alert (PRO+). `token_address`, `drop_pct` and `recovery_pct`
+   * are IMMUTABLE — changing a threshold would make the alert's recorded events
+   * uninterpretable, so delete and recreate instead.
+   * PATCH /rhc/price-alerts/{id}
+   */
+  updatePriceAlert(
+    id: number,
+    updates: {
+      name?: string | null;
+      delivery_mode?: "webhook" | "websocket" | "both";
+      webhook_url?: string | null;
+      is_active?: boolean;
+    },
+  ) {
+    return this.restRequest<RhcPriceAlertResponse>(
+      "PATCH",
+      `/rhc/price-alerts/${id}`,
+      undefined,
+      updates,
+    );
+  }
+
+  /** Delete a price alert (PRO+). DELETE /rhc/price-alerts/{id} */
+  deletePriceAlert(id: number) {
+    return this.restRequest<RhcDeletedResponse>("DELETE", `/rhc/price-alerts/${id}`);
+  }
+
+  /**
+   * Dip / recovery fire history for your price alerts — the catch-up path.
+   * Retained 30 days (PRO+). GET /rhc/price-alerts/events
+   */
+  getPriceAlertEvents(params?: {
+    /** 1–500, default 50. */
+    limit?: number;
+    event_type?: "dip" | "recovery";
+    /** ISO 8601 — only events fired at or after this instant. */
+    since?: string;
+    /** Restrict to one alert you own. */
+    alert_id?: number;
+  }) {
+    return this.restRequest<RhcPriceAlertEventsResponse>("GET", "/rhc/price-alerts/events", params);
+  }
+
+  // ── KOL coordination alert rules (PRO+) ──
+
+  /** List your RHC coordination alert rules (PRO+). GET /rhc/kol/coordination/alerts */
+  getCoordinationAlerts() {
+    return this.restRequest<RhcCoordinationAlertRulesResponse>(
+      "GET",
+      "/rhc/kol/coordination/alerts",
+    );
+  }
+
+  /**
+   * Create a coordination alert rule — fire when `min_kols`+ tracked KOLs buy the
+   * same RHC token inside `window_minutes` (PRO+). Scoring is the shared v1 scorer
+   * so the number is comparable to Solana, but the `earliness` component is
+   * DEFAULTED on RHC (no early-entry equivalent); `quality` is real. Each fired
+   * signal records which components were real in `score_inputs`.
+   * POST /rhc/kol/coordination/alerts
+   */
+  createCoordinationAlert(input: {
+    name?: string;
+    /** 2–50, default 3. */
+    min_kols?: number;
+    /** 1–60, default 15. */
+    window_minutes?: number;
+    /** 0–100, default 0. */
+    min_score?: number;
+    /** 1–1440 minutes, default 30. */
+    cooldown_min?: number;
+    /** Re-fire inside the cooldown if the score jumps by this much. 0–100, default 20. */
+    score_jump_break?: number;
+    min_mc_usd?: number | null;
+    max_mc_usd?: number | null;
+    delivery_mode?: "websocket" | "webhook" | "both";
+    webhook_url?: string;
+  }) {
+    return this.restRequest<RhcCoordinationAlertRuleCreatedResponse>(
+      "POST",
+      "/rhc/kol/coordination/alerts",
+      undefined,
+      input,
+    );
+  }
+
+  /** One coordination alert rule by UUID (PRO+). GET /rhc/kol/coordination/alerts/{id} */
+  getCoordinationAlert(id: string) {
+    return this.restRequest<RhcCoordinationAlertRuleResponse>(
+      "GET",
+      `/rhc/kol/coordination/alerts/${encodeURIComponent(id)}`,
+    );
+  }
+
+  /** Update a coordination alert rule (PRO+). PATCH /rhc/kol/coordination/alerts/{id} */
+  updateCoordinationAlert(
+    id: string,
+    updates: {
+      name?: string | null;
+      min_kols?: number;
+      window_minutes?: number;
+      min_score?: number;
+      cooldown_min?: number;
+      score_jump_break?: number;
+      min_mc_usd?: number | null;
+      max_mc_usd?: number | null;
+      delivery_mode?: "websocket" | "webhook" | "both";
+      webhook_url?: string | null;
+      is_active?: boolean;
+    },
+  ) {
+    return this.restRequest<RhcCoordinationAlertRuleResponse>(
+      "PATCH",
+      `/rhc/kol/coordination/alerts/${encodeURIComponent(id)}`,
+      undefined,
+      updates,
+    );
+  }
+
+  /** Delete a coordination alert rule (PRO+). DELETE /rhc/kol/coordination/alerts/{id} */
+  deleteCoordinationAlert(id: string) {
+    return this.restRequest<RhcDeletedResponse>(
+      "DELETE",
+      `/rhc/kol/coordination/alerts/${encodeURIComponent(id)}`,
+    );
+  }
+
+  // ── KOL first-touch subscriptions (ULTRA+) ──
+
+  /** List your RHC first-touch subscriptions (ULTRA+). GET /rhc/kol/first-touches/subscriptions */
+  getFirstTouchSubscriptions() {
+    return this.restRequest<RhcFirstTouchSubscriptionsResponse>(
+      "GET",
+      "/rhc/kol/first-touches/subscriptions",
+    );
+  }
+
+  /**
+   * Subscribe to RHC first touches — push when a token gets its FIRST tracked-KOL
+   * buy (ULTRA+). Filters are RHC-specific: `min_kol_winrate` and `strategy`
+   * replace Solana's scout-tier filters, which have no RHC equivalent. Unknown
+   * filter keys are rejected rather than silently ignored.
+   * POST /rhc/kol/first-touches/subscriptions
+   */
+  createFirstTouchSubscription(input: {
+    name?: string;
+    filters?: RhcFirstTouchFilters;
+    delivery_mode?: "websocket" | "webhook" | "both";
+    webhook_url?: string;
+  }) {
+    return this.restRequest<RhcFirstTouchSubscriptionCreatedResponse>(
+      "POST",
+      "/rhc/kol/first-touches/subscriptions",
+      undefined,
+      input,
+    );
+  }
+
+  /** One first-touch subscription by UUID (ULTRA+). GET /rhc/kol/first-touches/subscriptions/{id} */
+  getFirstTouchSubscription(id: string) {
+    return this.restRequest<RhcFirstTouchSubscriptionResponse>(
+      "GET",
+      `/rhc/kol/first-touches/subscriptions/${encodeURIComponent(id)}`,
+    );
+  }
+
+  /**
+   * Update a first-touch subscription (ULTRA+). `filters` is a WHOLE-OBJECT
+   * replace, not a merge — send the complete filter set you want, otherwise
+   * removing a filter would be impossible to express.
+   * PATCH /rhc/kol/first-touches/subscriptions/{id}
+   */
+  updateFirstTouchSubscription(
+    id: string,
+    updates: {
+      name?: string | null;
+      filters?: RhcFirstTouchFilters;
+      delivery_mode?: "websocket" | "webhook" | "both";
+      webhook_url?: string | null;
+      is_active?: boolean;
+    },
+  ) {
+    return this.restRequest<RhcFirstTouchSubscriptionResponse>(
+      "PATCH",
+      `/rhc/kol/first-touches/subscriptions/${encodeURIComponent(id)}`,
+      undefined,
+      updates,
+    );
+  }
+
+  /** Delete a first-touch subscription (ULTRA+). DELETE /rhc/kol/first-touches/subscriptions/{id} */
+  deleteFirstTouchSubscription(id: string) {
+    return this.restRequest<RhcDeletedResponse>(
+      "DELETE",
+      `/rhc/kol/first-touches/subscriptions/${encodeURIComponent(id)}`,
+    );
   }
 }

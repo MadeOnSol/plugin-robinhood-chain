@@ -24,6 +24,12 @@ import { rhcDeployerStatsAction } from "./actions/deployer-stats.js";
 import { rhcDeployerAlertsAction } from "./actions/deployer-alerts.js";
 import { rhcRecentBondsAction } from "./actions/deployer-recent-bonds.js";
 import { rhcAlphaWalletsAction } from "./actions/alpha-wallets.js";
+import { rhcCopytradeRulesAction } from "./actions/copytrade-rules.js";
+import { rhcCopytradeSignalsAction } from "./actions/copytrade-signals.js";
+import { rhcPriceAlertsAction } from "./actions/price-alerts.js";
+import { rhcPriceAlertEventsAction } from "./actions/price-alert-events.js";
+import { rhcCoordinationAlertsAction } from "./actions/coordination-alerts.js";
+import { rhcFirstTouchSubscriptionsAction } from "./actions/first-touch-subscriptions.js";
 import { RobinhoodChainClient } from "./client.js";
 
 /** Key used to store the initialized client on the runtime. */
@@ -32,7 +38,7 @@ export const RHC_CLIENT_KEY = "robinhood-chain:client";
 export const robinhoodChainPlugin: Plugin = {
   name: "robinhood-chain",
   description:
-    "Query Robinhood Chain (chain id 4663) trading intelligence from MadeOnSol: EVM-native KOL trades, KOL coordination and first touches, token discovery and batch lookups, launch-bundle detection, buyer quality, deployer reputation with trajectory/history/alerts, the DEX trade tape, and smart-money wallet rankings — from a self-hosted RHC node.",
+    "Query Robinhood Chain (chain id 4663) trading intelligence from MadeOnSol: EVM-native KOL trades, KOL coordination and first touches, token discovery and batch lookups, launch-bundle detection, buyer quality, deployer reputation with trajectory/history/alerts, the DEX trade tape, and smart-money wallet rankings — from a self-hosted RHC node. Also manages the RHC rule engine: copy-trade rules, market-cap price alerts (~15s polled, not sub-second), KOL coordination alerts and first-touch subscriptions, all with per-chain quotas. Data only — rules deliver signals, they never execute a trade.",
   actions: [
     rhcKolFeedAction,
     rhcKolLeaderboardAction,
@@ -59,6 +65,12 @@ export const robinhoodChainPlugin: Plugin = {
     rhcDeployerAlertsAction,
     rhcRecentBondsAction,
     rhcAlphaWalletsAction,
+    rhcCopytradeRulesAction,
+    rhcCopytradeSignalsAction,
+    rhcPriceAlertsAction,
+    rhcPriceAlertEventsAction,
+    rhcCoordinationAlertsAction,
+    rhcFirstTouchSubscriptionsAction,
   ],
 
   /**
@@ -131,6 +143,28 @@ export type {
   RhcDeployerAlertsResponse,
   RhcRecentBondsResponse,
   RhcAlphaWalletsResponse,
+  RhcDeletedResponse,
+  RhcCopytradeSubscription,
+  RhcCopytradeSubscriptionsResponse,
+  RhcCopytradeSubscriptionResponse,
+  RhcCopytradeSubscriptionCreatedResponse,
+  RhcCopytradeSignal,
+  RhcCopytradeSignalsResponse,
+  RhcPriceAlert,
+  RhcPriceAlertsResponse,
+  RhcPriceAlertResponse,
+  RhcPriceAlertCreatedResponse,
+  RhcPriceAlertEvent,
+  RhcPriceAlertEventsResponse,
+  RhcCoordinationAlertRule,
+  RhcCoordinationAlertRulesResponse,
+  RhcCoordinationAlertRuleResponse,
+  RhcCoordinationAlertRuleCreatedResponse,
+  RhcFirstTouchFilters,
+  RhcFirstTouchSubscription,
+  RhcFirstTouchSubscriptionsResponse,
+  RhcFirstTouchSubscriptionResponse,
+  RhcFirstTouchSubscriptionCreatedResponse,
 } from "./client.js";
 export {
   rhcKolFeedAction,
@@ -158,4 +192,10 @@ export {
   rhcDeployerAlertsAction,
   rhcRecentBondsAction,
   rhcAlphaWalletsAction,
+  rhcCopytradeRulesAction,
+  rhcCopytradeSignalsAction,
+  rhcPriceAlertsAction,
+  rhcPriceAlertEventsAction,
+  rhcCoordinationAlertsAction,
+  rhcFirstTouchSubscriptionsAction,
 };

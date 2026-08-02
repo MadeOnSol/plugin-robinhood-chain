@@ -7,9 +7,11 @@
 
 > 🤖 **[Robinhood Chain API](https://madeonsol.com/robinhood)** · 📚 **[API docs](https://madeonsol.com/api-docs)** · 💰 **[Free API key](https://madeonsol.com/pricing)** · 🤖 **[ElizaOS](https://github.com/elizaOS/eliza)**
 
-**ElizaOS plugin for the Robinhood Chain API** — EVM-native, on-chain trading intelligence for **Robinhood Chain (chain id 4663)**. Give your ElizaOS agent live KOL trades, KOL coordination and first touches, token discovery and batch lookups, launch-bundle detection, buyer-quality scoring, deployer reputation with trajectory/history/alerts, the DEX trade tape, and smart-money wallet rankings — all from [MadeOnSol](https://madeonsol.com)'s self-hosted RHC node.
+**ElizaOS plugin for the Robinhood Chain API** — EVM-native, on-chain trading intelligence for **Robinhood Chain (chain id 4663)**. Give your ElizaOS agent live KOL trades, KOL coordination and first touches, token discovery and batch lookups, launch-bundle detection, buyer-quality scoring, deployer reputation with trajectory/history/alerts, the DEX trade tape, smart-money wallet rankings, and the RHC **rule engine** — all from [MadeOnSol](https://madeonsol.com)'s self-hosted RHC node.
 
-> **New — 30 endpoints (was 14).** Deployer intelligence deepened: `trajectory` (is this deployer improving or declining), the paginated `tokens` launch list, `history`, chain-wide `stats`, the `alerts` feed and `best-tokens` from reputable deployers only. Plus KOL `coordination` and `first-touches`, and two batch endpoints (50 tokens per price lookup, 20 per buyer-quality scoring) that count as one request each.
+> **New in 0.4.0 — the rule engine: 52 endpoints (was 30).** 22 new operations let your agent create and manage server-side rules that push signals to a webhook or WebSocket: **copy-trade rules** (watch up to 250 source wallets, ETH-denominated sizing), **price alerts** (market-cap drop + optional recovery leg), **KOL coordination alerts** (N+ KOLs on one token in a window) and **first-touch subscriptions** (the first tracked-KOL buy on a token). Rules are data, never execution — a fired rule delivers a *suggested* size, it never places an order. Every quota is **per chain**: a full set of Solana rules does not consume RHC capacity.
+>
+> Earlier: deployer intelligence deepened — `trajectory` (is this deployer improving or declining), the paginated `tokens` launch list, `history`, chain-wide `stats`, the `alerts` feed and `best-tokens` from reputable deployers only. Plus KOL `coordination` and `first-touches`, and two batch endpoints (50 tokens per price lookup, 20 per buyer-quality scoring) that count as one request each.
 
 > Robinhood Chain intelligence, EVM-native: track Solana KOLs' verified RHC wallets (recovered by tracing their Solana→EVM bridge deposits — a dataset unique to MadeOnSol), rank 99k+ RHC deployers by graduation/runner rate, detect same-block launch bundles and score early-buyer cohorts, and stream the Uniswap v2/v3/v4 trade tape with the effective trader EOA (`tx.from`, or the ERC-4337 userOp sender when bundled — never the bundler or the router). Every field is EVM-native — `token_address` (lowercase `0x`), `eth_amount`, `tx_hash`, `block_number`, `net_flow_eth`. **Same `msk_` API key, same base URL, bundled into every tier at no extra cost.** Get a free key at [madeonsol.com/pricing](https://madeonsol.com/pricing).
 
@@ -70,6 +72,27 @@ Gives your ElizaOS agent access to MadeOnSol's Robinhood Chain intelligence API.
 | `GET_RHC_RECENT_BONDS` | `GET /rhc/deployer-hunter/recent-bonds` | BASIC+ |
 | `GET_RHC_ALPHA_WALLETS` | `GET /rhc/alpha-wallets` | PRO+ |
 
+### Rule engine
+
+Rules are **data, not execution** — a fired rule delivers a signal (webhook and/or WebSocket) with a *suggested* size; nothing is ever traded on your behalf. Every quota below is **per chain**, so Solana rules do not eat into your RHC allowance.
+
+The four `MANAGE_*` actions list your rules by default, and pause / resume / delete only when the message names an explicit rule id (numeric for copy-trade and price alerts, a UUID for coordination alerts and first-touch subscriptions). **Creating** a rule takes a webhook URL and returns a one-time `webhook_secret`, so it lives on the typed client rather than on a natural-language action.
+
+| Action | Endpoints | Tier |
+|---|---|---|
+| `MANAGE_RHC_COPYTRADE_RULES` | `GET\|POST /rhc/copytrade/subscriptions`, `GET\|PATCH\|DELETE /rhc/copytrade/subscriptions/{id}` | PRO+ |
+| `GET_RHC_COPYTRADE_SIGNALS` | `GET /rhc/copytrade/signals` | PRO+ |
+| `MANAGE_RHC_PRICE_ALERTS` | `GET\|POST /rhc/price-alerts`, `GET\|PATCH\|DELETE /rhc/price-alerts/{id}` | PRO+ |
+| `GET_RHC_PRICE_ALERT_EVENTS` | `GET /rhc/price-alerts/events` | PRO+ |
+| `MANAGE_RHC_COORDINATION_ALERTS` | `GET\|POST /rhc/kol/coordination/alerts`, `GET\|PATCH\|DELETE /rhc/kol/coordination/alerts/{id}` | PRO+ |
+| `MANAGE_RHC_FIRST_TOUCH_SUBSCRIPTIONS` | `GET\|POST /rhc/kol/first-touches/subscriptions`, `GET\|PATCH\|DELETE /rhc/kol/first-touches/subscriptions/{id}` | ULTRA+ |
+
+Three RHC-specific behaviours worth knowing before you build on these:
+
+- **Price alerts are polled (~15s), not sub-second.** RHC prices are written by `rhc-dex-stream` on a separate box and emit no notification, so the evaluator polls. Effective latency is that ~15s interval *plus* the token's own price-update cadence. The Solana price alerts fire sub-second; assuming parity will mis-size a strategy. Alerts also expire 30 days after creation, and `token_address` / `drop_pct` / `recovery_pct` are immutable (delete and recreate to change a threshold).
+- **RHC copy-trade has no market-cap band.** The producer's event carries no market cap, so a `min_mc_usd` / `max_mc_usd` filter could only be a per-event lookup in the hot path of a ~3.3M trades/day chain. It is omitted rather than shipped as a filter that silently never matches. Amounts are ETH (`min_trade_eth`, `sizing_amount`), not SOL.
+- **Coordination scores: `quality` is real, `earliness` is defaulted.** The v1 scorer is shared with Solana so the number is comparable, but RHC has no early-entry equivalent, so that component is defaulted to 50 while `quality` uses the real KOL 7-day win rate. Each fired signal records which components were real in `score_inputs`. Likewise, first-touch filters offer `min_kol_winrate` and `strategy` instead of Solana's `min_scout_tier` / `min_n_touches` — RHC has no scout score, and a filter that silently matched nothing would be worse than its absence.
+
 ## Usage
 
 ```ts
@@ -97,6 +120,13 @@ Your agent can then answer queries like:
 - "Show the latest RHC deployer alerts from elite deployers"
 - "Which Robinhood Chain tokens have 3+ KOLs coordinating right now?"
 - "Show smart-money wallets on Robinhood Chain"
+- "List my Robinhood Chain copy-trade rules"
+- "Pause RHC copy-trade rule 12"
+- "What have my Robinhood Chain copy-trade rules fired lately?"
+- "Show my RHC price alerts"
+- "Which of my Robinhood Chain price alerts dipped this week?"
+- "List my RHC KOL coordination alert rules"
+- "Show my Robinhood Chain first-touch subscriptions"
 
 ### Programmatic client
 
@@ -137,6 +167,54 @@ const batch = await client.getTokenBatch(["0x1234…", "0xabcd…"]);
 const scores = await client.getTokenBatchBuyerQuality(["0x1234…", "0xabcd…"]);
 ```
 
+#### Rule engine (writes)
+
+```ts
+// Copy-trade rule — ETH-denominated, no market-cap band on RHC.
+// The rule delivers a SUGGESTED size; it never places an order.
+const rule = await client.createCopytradeSubscription({
+  name: "elite RHC wallets",
+  source_wallets: ["0x1234…", "0xabcd…"], // lowercased server-side
+  min_trade_eth: 0.05,
+  only_action: "buy",
+  sizing_mode: "proportional",
+  sizing_amount: 0.25,
+  delivery_mode: "webhook",
+  webhook_url: "https://your-app.example/rhc-copytrade",
+});
+// rule.data.webhook_secret is shown ONCE — store it. Payloads are signed
+// HMAC-SHA256 over `<timestamp>.<body>` in X-MadeOnSol-Signature.
+
+// Catch-up after a missed webhook (7-day retention)
+const signals = await client.getCopytradeSignals({ subscription_id: rule.data!.subscription.id });
+
+// Price alert — market-cap denominated, baseline captured NOW.
+// Evaluated on a ~15s POLL, not sub-second like the Solana alerts.
+const alert = await client.createPriceAlert({
+  token_address: "0x1234567890abcdef1234567890abcdef12345678",
+  drop_pct: 30,
+  recovery_pct: 15, // optional second leg, measured off the dip low
+  delivery_mode: "websocket",
+});
+// alert.data.evaluation → { mode: "polled", interval_seconds: 15, note }
+
+// Dip / recovery history (30-day retention)
+const events = await client.getPriceAlertEvents({ event_type: "dip", limit: 100 });
+
+// Coordination alert rule — quality is real, earliness is defaulted on RHC
+const coord = await client.createCoordinationAlert({ min_kols: 4, window_minutes: 15, min_score: 60 });
+
+// First-touch subscription (ULTRA+) — filters is a whole-object REPLACE on update
+const ft = await client.createFirstTouchSubscription({
+  filters: { min_first_buy_eth: 0.1, min_kol_winrate: 0.55, strategy: "swing" },
+});
+
+// Pause / resume / delete
+await client.updateCopytradeSubscription(rule.data!.subscription.id, { is_active: false });
+await client.deletePriceAlert(alert.data!.alert.id);
+await client.deleteFirstTouchSubscription(ft.data!.subscription.id); // UUID
+```
+
 Every request populates `client.lastRateLimit` (`limit` / `remaining` / `reset` / `requestId`).
 
 ## Why Robinhood Chain
@@ -156,7 +234,7 @@ Robinhood Chain is an Arbitrum Orbit L2 (chain id 4663). Two things follow from 
 | ULTRA | €131/mo (€1310/yr) ≈ $149 | 100,000 |
 | BUSINESS | €400/mo (€4000/yr) ≈ $449 | 500,000 |
 
-Robinhood Chain coverage is bundled into every tier at no extra cost. BASIC endpoints work with any valid key; `GET /rhc/trades`, `GET /rhc/tokens`, `GET /rhc/tokens/{address}/candles`, `GET /rhc/tokens/{address}/kol-consensus`, `GET /rhc/deployer-hunter/{address}/history`, and `GET /rhc/alpha-wallets` require PRO+. ULTRA unlocks the deepest fields (the full bundle cohort with wallet identity, the KOL-consensus `buyers`/`exited` lists, `first_kol.evm_address` on first-touches, and the full 500-alert page on the deployer alert feed — BASIC/PRO cap at 50). Get a key at [madeonsol.com/pricing](https://madeonsol.com/pricing).
+Robinhood Chain coverage is bundled into every tier at no extra cost. BASIC endpoints work with any valid key; `GET /rhc/trades`, `GET /rhc/tokens`, `GET /rhc/tokens/{address}/candles`, `GET /rhc/tokens/{address}/kol-consensus`, `GET /rhc/deployer-hunter/{address}/history`, `GET /rhc/alpha-wallets`, and the whole rule engine except first touches (copy-trade rules + signals, price alerts + events, coordination alerts) require PRO+. First-touch subscriptions require ULTRA+. Rule-engine quotas — how many rules, and how many source wallets per copy-trade rule — scale with tier and are counted **per chain**. ULTRA also unlocks the deepest read fields (the full bundle cohort with wallet identity, the KOL-consensus `buyers`/`exited` lists, `first_kol.evm_address` on first-touches, and the full 500-alert page on the deployer alert feed — BASIC/PRO cap at 50). Get a key at [madeonsol.com/pricing](https://madeonsol.com/pricing).
 
 ## Also Available
 
