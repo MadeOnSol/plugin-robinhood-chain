@@ -24,6 +24,12 @@ import { rhcDeployerStatsAction } from "./actions/deployer-stats.js";
 import { rhcDeployerAlertsAction } from "./actions/deployer-alerts.js";
 import { rhcRecentBondsAction } from "./actions/deployer-recent-bonds.js";
 import { rhcAlphaWalletsAction } from "./actions/alpha-wallets.js";
+import { rhcWalletAction } from "./actions/wallet.js";
+import { rhcWalletPnlAction } from "./actions/wallet-pnl.js";
+import { rhcWalletPositionsAction } from "./actions/wallet-positions.js";
+import { rhcWalletTradesAction } from "./actions/wallet-trades.js";
+import { rhcWalletTrackerAction } from "./actions/wallet-tracker.js";
+import { rhcWalletTrackerFeedAction } from "./actions/wallet-tracker-feed.js";
 import { rhcCopytradeRulesAction } from "./actions/copytrade-rules.js";
 import { rhcCopytradeSignalsAction } from "./actions/copytrade-signals.js";
 import { rhcPriceAlertsAction } from "./actions/price-alerts.js";
@@ -65,6 +71,12 @@ export const robinhoodChainPlugin: Plugin = {
     rhcDeployerAlertsAction,
     rhcRecentBondsAction,
     rhcAlphaWalletsAction,
+    rhcWalletAction,
+    rhcWalletPnlAction,
+    rhcWalletPositionsAction,
+    rhcWalletTradesAction,
+    rhcWalletTrackerAction,
+    rhcWalletTrackerFeedAction,
     rhcCopytradeRulesAction,
     rhcCopytradeSignalsAction,
     rhcPriceAlertsAction,
@@ -143,6 +155,18 @@ export type {
   RhcDeployerAlertsResponse,
   RhcRecentBondsResponse,
   RhcAlphaWalletsResponse,
+  RhcWalletProfileResponse,
+  RhcWalletPnlResponse,
+  RhcWalletPositionsResponse,
+  RhcOpenPosition,
+  RhcWalletTrade,
+  RhcWalletTradesResponse,
+  RhcTrackedWallet,
+  RhcWalletTrackerListResponse,
+  RhcWalletTrackerWalletResponse,
+  RhcWalletTrackerRemovedResponse,
+  RhcWalletTrackerTradesResponse,
+  RhcWalletTrackerSummaryResponse,
   RhcDeletedResponse,
   RhcCopytradeSubscription,
   RhcCopytradeSubscriptionsResponse,
@@ -192,6 +216,12 @@ export {
   rhcDeployerAlertsAction,
   rhcRecentBondsAction,
   rhcAlphaWalletsAction,
+  rhcWalletAction,
+  rhcWalletPnlAction,
+  rhcWalletPositionsAction,
+  rhcWalletTradesAction,
+  rhcWalletTrackerAction,
+  rhcWalletTrackerFeedAction,
   rhcCopytradeRulesAction,
   rhcCopytradeSignalsAction,
   rhcPriceAlertsAction,

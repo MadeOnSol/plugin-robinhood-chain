@@ -743,6 +743,231 @@ export interface RhcAlphaWalletsResponse {
   has_more: boolean;
 }
 
+// ── Wallet intelligence ──
+//
+// Every figure is ETH-denominated. Cost basis is FIFO over a rolling 90-day
+// window, so "open" means FIFO-unmatched buys INSIDE that window: a position
+// opened earlier reads as a sell with no matching buy. `partial` and
+// `cost_basis_observable_from` disclose exactly that.
+
+export interface RhcWalletProfileResponse {
+  chain: "robinhood";
+  address: string;
+  stats: {
+    first_seen: string | null;
+    last_seen: string | null;
+    total_trades: number;
+    /** Denominator for every PnL figure below. */
+    analyzed_trades: number;
+    /** Pre-2026-07-18 rows with a NULL trader_eoa — unattributable by design. */
+    unattributed_trades: number;
+    unsized_trades: number;
+    buys: number;
+    sells: number;
+    bought_eth: number;
+    sold_eth: number;
+    realized_pnl_eth: number;
+    unrealized_pnl_eth: number;
+    total_pnl_eth: number;
+    held_value_eth: number;
+    unique_tokens: number;
+    open_positions: number;
+    window_days: number;
+    partial: boolean;
+  };
+  flags: {
+    is_kol: boolean;
+    kol_name: string | null;
+    is_deployer: boolean;
+    deployer_tier: string | null;
+    deployer_tokens: number | null;
+    deployer_runner_rate: number | null;
+    is_alpha_tracked: boolean;
+    alpha_win_rate: number | null;
+    alpha_net_eth: number | null;
+    alpha_tokens_traded: number | null;
+    likely_bot: boolean | null;
+    is_dumper: boolean;
+    early_buyer_tokens: number;
+  };
+  top_tokens: Record<string, unknown>[];
+  recent_trades: Record<string, unknown>[];
+  derived: {
+    win_rate: number | null;
+    wins: number;
+    losses: number;
+    avg_trade_size_eth: number | null;
+    is_active: boolean;
+  };
+  /** `true` when the snapshot timed out — `flags` still resolve. */
+  stats_unavailable: boolean;
+  cache_hit: boolean;
+}
+
+export interface RhcOpenPosition {
+  token_address: string;
+  token_symbol: string | null;
+  token_name: string | null;
+  launchpad: string | null;
+  is_graduated: boolean | null;
+  token_amount: number;
+  cost_basis_eth: number;
+  avg_entry_price_eth: number;
+  current_price_eth: number | null;
+  current_value_eth: number | null;
+  unrealized_eth: number | null;
+  unrealized_pct: number | null;
+  current_mc_usd: number | null;
+  liquidity_usd: number | null;
+  /** `v4_virtual_ceiling` = bonding-curve ceiling, NOT withdrawable TVL. */
+  liquidity_basis: "v4_virtual_ceiling" | "measured";
+  buys_in_position: number;
+  realized_so_far_eth: number;
+  first_buy_at: string | null;
+  last_buy_at: string | null;
+}
+
+export interface RhcWalletPnlResponse {
+  chain: "robinhood";
+  address: string;
+  window_days: number;
+  summary: {
+    realized_eth: number;
+    unrealized_eth: number;
+    total_pnl_eth: number;
+    total_bought_eth: number;
+    total_sold_eth: number;
+    wins: number;
+    losses: number;
+    win_rate: number | null;
+    profit_factor: number | null;
+    avg_hold_minutes: number | null;
+    median_hold_minutes: number | null;
+    max_drawdown_eth: number;
+    open_positions_count: number;
+    closed_positions_count: number;
+    total_tokens_traded: number;
+  };
+  pnl_curve: { date: string; day_pnl: number; cumulative_pnl: number; trades: number }[];
+  closed_positions: {
+    token_address: string;
+    token_symbol: string | null;
+    bought_eth: number;
+    sold_eth: number;
+    pnl_eth: number;
+    roi_pct: number | null;
+    hold_minutes: number | null;
+    result: "win" | "loss" | "breakeven";
+  }[];
+  open_positions: RhcOpenPosition[];
+  notes: {
+    denomination: "ETH";
+    /** Buys before this date are invisible to cost basis. */
+    cost_basis_observable_from: string;
+    partial: boolean;
+    partial_reason: string;
+  };
+  cache_hit: boolean;
+}
+
+export interface RhcWalletPositionsResponse {
+  chain: "robinhood";
+  address: string;
+  window_days: number;
+  summary: {
+    open_positions: number;
+    total_cost_basis_eth: number;
+    total_current_value_eth: number;
+    total_unrealized_eth: number;
+    /** Excluded from the value/unrealized totals. */
+    unpriced_positions: number;
+  };
+  positions: RhcOpenPosition[];
+}
+
+export interface RhcWalletTrade {
+  token_address: string | null;
+  token_symbol: string | null;
+  launchpad: string | null;
+  action: "buy" | "sell" | null;
+  eth_amount: number | null;
+  token_amount: number | null;
+  price_usd: number | null;
+  mc_usd_at_trade: number | null;
+  dex: string | null;
+  tx_hash: string;
+  block_number: number;
+  block_time: string;
+}
+
+export interface RhcWalletTradesResponse {
+  chain: "robinhood";
+  address: string;
+  trades: RhcWalletTrade[];
+  count: number;
+  has_more: boolean;
+  /** Opaque keyset cursor — `null` when the tape is exhausted. */
+  next_before: string | null;
+}
+
+// ── Wallet tracker (watchlist) ──
+//
+// Quotas are PER CHAIN: PRO 50 / ULTRA 100 / BUSINESS 500 RHC wallets,
+// independent of the Solana watchlist. Addresses are lowercased on write to
+// match `rhc_trades.trader_eoa`.
+
+export interface RhcTrackedWallet {
+  wallet_address: string;
+  label: string | null;
+  added_at: string;
+}
+
+export interface RhcWalletTrackerListResponse {
+  chain: "robinhood";
+  wallets: RhcTrackedWallet[];
+  count: number;
+  limit: number;
+  remaining: number;
+}
+
+export interface RhcWalletTrackerWalletResponse {
+  chain: "robinhood";
+  wallet: RhcTrackedWallet;
+}
+
+export interface RhcWalletTrackerRemovedResponse {
+  chain: "robinhood";
+  removed: string;
+}
+
+export interface RhcWalletTrackerTradesResponse {
+  chain: "robinhood";
+  trades: (RhcWalletTrade & { trader_eoa: string | null; label: string | null })[];
+  count: number;
+  has_more: boolean;
+  next_before: string | null;
+}
+
+export interface RhcWalletTrackerSummaryResponse {
+  chain: "robinhood";
+  period: string;
+  interval: string;
+  /** `true` when the rollup timed out — stats are zeroed, not absent. */
+  stats_unavailable: boolean;
+  wallets: (RhcTrackedWallet & {
+    stats: {
+      trades: number;
+      buys: number;
+      sells: number;
+      buy_eth: number;
+      sell_eth: number;
+      net_eth: number;
+      tokens_traded: number;
+      last_trade_at: string | null;
+    };
+  })[];
+}
+
 // ── Rule engine (copy-trade, price alerts, coordination, first touches) ──
 //
 // These are the only WRITE surfaces on Robinhood Chain — they create server-side
@@ -1418,6 +1643,124 @@ export class RobinhoodChainClient {
     offset?: number;
   }) {
     return this.restRequest<RhcAlphaWalletsResponse>("GET", "/rhc/alpha-wallets", params);
+  }
+
+  // ── Wallet intelligence (PRO+) ──
+  //
+  // The profile / pnl / positions trio shares ONE 90-day snapshot cache
+  // server-side, so calling all three on an address costs roughly one
+  // computation — `cache_hit` says which call paid for it.
+
+  /**
+   * Any RHC wallet's 90-day profile — ETH-denominated FIFO PnL, per-token
+   * breakdown, recent trades, plus reputation flags (KOL, deployer + tier,
+   * alpha-ranked, dump cluster, early-buyer count). PRO+.
+   * GET /rhc/wallet/{address}
+   */
+  getWallet(address: string) {
+    return this.restRequest<RhcWalletProfileResponse>("GET", `/rhc/wallet/${encodeURIComponent(address)}`);
+  }
+
+  /**
+   * Full FIFO cost-basis PnL over 90 days — realized/unrealized split, daily
+   * curve, closed positions with ROI and hold time, open positions marked to
+   * market. Same FIFO implementation as Solana's, so the chains compare
+   * directly. PRO+. GET /rhc/wallet/{address}/pnl
+   */
+  getWalletPnl(address: string) {
+    return this.restRequest<RhcWalletPnlResponse>("GET", `/rhc/wallet/${encodeURIComponent(address)}/pnl`);
+  }
+
+  /**
+   * Only what the wallet still holds, marked to the current price. Check
+   * `liquidity_basis` before sizing an exit — `v4_virtual_ceiling` is a
+   * bonding-curve ceiling, not withdrawable TVL. PRO+.
+   * GET /rhc/wallet/{address}/positions
+   */
+  getWalletPositions(address: string) {
+    return this.restRequest<RhcWalletPositionsResponse>("GET", `/rhc/wallet/${encodeURIComponent(address)}/positions`);
+  }
+
+  /**
+   * One wallet's swaps, newest first, keyset-paginated. Filters by WALLET —
+   * `getTrades({ token })` filters the global tape by TOKEN instead. PRO+.
+   * GET /rhc/wallet/{address}/trades
+   */
+  getWalletTrades(
+    address: string,
+    params?: { limit?: number; before?: string; since?: string; action?: "buy" | "sell"; token?: string },
+  ) {
+    return this.restRequest<RhcWalletTradesResponse>("GET", `/rhc/wallet/${encodeURIComponent(address)}/trades`, params);
+  }
+
+  // ── Wallet tracker / watchlist (PRO+) ──
+  //
+  // Quotas are PER CHAIN — PRO 50 / ULTRA 100 / BUSINESS 500 RHC wallets,
+  // independent of the Solana watchlist.
+
+  /** Your RHC watchlist, with count/limit/remaining. PRO+. GET /rhc/wallet-tracker/watchlist */
+  getWalletTrackerList() {
+    return this.restRequest<RhcWalletTrackerListResponse>("GET", "/rhc/wallet-tracker/watchlist");
+  }
+
+  /**
+   * Track an RHC wallet. Stored lowercase to match `rhc_trades.trader_eoa` —
+   * a checksummed address would join to nothing. 409 if already tracked.
+   * PRO+. POST /rhc/wallet-tracker/watchlist
+   */
+  addTrackedWallet(input: { wallet_address: string; label?: string }) {
+    return this.restRequest<RhcWalletTrackerWalletResponse>(
+      "POST",
+      "/rhc/wallet-tracker/watchlist",
+      undefined,
+      input.label === undefined ? { wallet_address: input.wallet_address } : input,
+    );
+  }
+
+  /** Untrack an RHC wallet, freeing a quota slot. PRO+. DELETE /rhc/wallet-tracker/watchlist/{address} */
+  removeTrackedWallet(address: string) {
+    return this.restRequest<RhcWalletTrackerRemovedResponse>(
+      "DELETE",
+      `/rhc/wallet-tracker/watchlist/${encodeURIComponent(address)}`,
+    );
+  }
+
+  /**
+   * Relabel a tracked wallet. `null` clears the label (accepted here, unlike
+   * on add). PRO+. PATCH /rhc/wallet-tracker/watchlist/{address}
+   */
+  relabelTrackedWallet(address: string, label: string | null) {
+    return this.restRequest<RhcWalletTrackerWalletResponse>(
+      "PATCH",
+      `/rhc/wallet-tracker/watchlist/${encodeURIComponent(address)}`,
+      undefined,
+      { label },
+    );
+  }
+
+  /**
+   * Merged trade feed across your tracked wallets, each row label-tagged.
+   * Cursor is an opaque keyset, not the Solana tracker's integer epoch.
+   * PRO+. GET /rhc/wallet-tracker/trades
+   */
+  getWalletTrackerTrades(params?: {
+    limit?: number;
+    before?: string;
+    wallet?: string;
+    action?: "buy" | "sell";
+    token?: string;
+  }) {
+    return this.restRequest<RhcWalletTrackerTradesResponse>("GET", "/rhc/wallet-tracker/trades", params);
+  }
+
+  /**
+   * Per-wallet buy/sell/volume rollup. Sourced from `rhc_trades` directly, not
+   * a per-subscriber capture log — so a newly tracked wallet has full history
+   * immediately, which the Solana tracker cannot do. PRO+.
+   * GET /rhc/wallet-tracker/summary
+   */
+  getWalletTrackerSummary(params?: { period?: string; wallet?: string }) {
+    return this.restRequest<RhcWalletTrackerSummaryResponse>("GET", "/rhc/wallet-tracker/summary", params);
   }
 
   // ── Copy-trade rules (PRO+) ──
