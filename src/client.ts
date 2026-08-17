@@ -1441,8 +1441,10 @@ export class RobinhoodChainClient {
   /**
    * Exact holder set + concentration from ERC-20 Transfer-log replay, reconciled
    * against on-chain totalSupply(). Check `verified` before relying on it.
-   * Concentration excludes pools and burns; `balance` is a uint256 decimal string
-   * (PRO+). GET /rhc/tokens/{address}/holders
+   * Concentration excludes pools and burns; `balance` is a uint256 decimal string.
+   * `holder_growth.{1h,24h,7d}` = entered / entered_still_holding / exited / net
+   * (≈ Δ holder_count) per window; a window is null only when the chain had no
+   * ingested trades in it (PRO+). GET /rhc/tokens/{address}/holders
    */
   getTokenHolders(address: string, params: { limit?: number; offset?: number } = {}) {
     return this.restRequest<unknown>(
