@@ -11,6 +11,8 @@
 
 > **0.5.0** — version alignment with the wider RHC SDK release: the stream channel names were corrected in the TS/Python/Rust SDKs (the RHC firehose channel is `rhc:dex_trades`; the server accepts `rhc:trades` only as a deprecated alias of it). This plugin's actions are REST-only, so nothing here changed behavior.
 
+> **New in 0.8.0 — tokenized equities + the liquidity-removals feed.** Two new actions / client methods. `GET_RHC_EQUITIES` / `client.getEquities()` (`GET /rhc/equities`, **BASIC+**) lists every official Robinhood tokenized stock and ETF (NVDA, SPY, AAPL, …) with live price / MC / liquidity and 24h trades, ETH volume and buyer-seller split, sortable by `volume` / `trades` / `market_cap` / `last_trade` / `symbol`, filterable by exact `symbol` or substring `q`. **Identity is the issuer beacon, never the name**: a token is listed only if its contract is an EIP-1967 beacon proxy on Robinhood's issuer beacon `0xe10b6f6b…151b00`, read from our own node — on ship day there were 20 fake "GameStop • Robinhood Token" contracts and 8 fake NVDAs with the exact official suffix, and none of them appear. `GET_RHC_LP_EVENTS` / `client.getLpEvents()` (`GET /rhc/lp-events`, **PRO+**) is the rug signal: Uniswap v2/v3 `Burn` and v4 `ModifyLiquidity` with a negative delta on tracked pools, from our node's log subscription, filterable by `token` / `pool` / `provider` / `dex` and cursor-paginated on `next_before`. **Removals only** — adds are not persisted (the response's `coverage` block says `adds_persisted: false`), amounts are raw uint256 **strings**, v4 rows carry `liquidity` only, and `provider_is_token_deployer` is the classic rug tell. Data since 2026-08-05.
+
 > **New in 0.7.0 — `holder_growth`: who arrived and who left.** `client.getTokenHolders(address)` now returns `holder_growth` on `GET /rhc/tokens/{address}/holders`: `{ "1h", "24h", "7d" }` × `{ cutoff_block, entered, entered_still_holding, exited, net }`. *entered* = addresses whose first `Transfer` of the token landed at-or-after the window's cutoff block (any current balance); *entered_still_holding* = those still non-zero; *exited* = pre-existing holders whose last movement in the window left them at zero; *net* ≈ the change in `holder_count`. Pools and burn addresses are excluded from every count. This exists because RHC balances are folded from ERC-20 Transfer logs on our own node — the fold keeps first-seen and last-moved blocks per address and retains zero-balance rows — so it is a direct read, not an estimate; the Solana census is a point-in-time ledger scan with no history and cannot answer this. A window is `null` (never 0) only when the chain had no ingested trades in it; the whole block is `null` only if the growth read failed. Sanity check from ship day: a token launched that morning showed 593 entered / 560 still holding over 24h, and `holder_count` was exactly 560.
 
 > **New in 0.6.0 — wallet intelligence.** Ten new operations covering the Robinhood Chain wallet surface, which had no SDK binding at all until now: six new actions — `GET_RHC_WALLET`, `GET_RHC_WALLET_PNL`, `GET_RHC_WALLET_POSITIONS`, `GET_RHC_WALLET_TRADES`, `MANAGE_RHC_WALLET_TRACKER` (list / add / remove / relabel in one action) and `GET_RHC_WALLET_TRACKER_FEED` (merged tape or per-wallet rollup). Everything is **ETH**-denominated, and cost basis is FIFO over a rolling 90-day window — `cost_basis_observable_from` names the date the window opens, so a position opened before it reads as a sell with no matching buy. The profile / PnL / positions trio shares ONE snapshot cache server-side, so calling all three on an address costs roughly one computation rather than three; `cache_hit` says which call paid for it. Watchlist quotas are **per chain** (PRO 50 / ULTRA 100 / BUSINESS 500 RHC wallets), independent of your Solana list.
@@ -59,7 +61,9 @@ Gives your ElizaOS agent access to MadeOnSol's Robinhood Chain intelligence API.
 | `GET_RHC_KOL_COORDINATION` | `GET /rhc/kol/coordination` | BASIC+ |
 | `GET_RHC_KOL_FIRST_TOUCHES` | `GET /rhc/kol/first-touches` | BASIC+ |
 | `GET_RHC_TRADES` | `GET /rhc/trades` | PRO+ |
+| `GET_RHC_LP_EVENTS` | `GET /rhc/lp-events` — liquidity **removals** only (rug signal) | PRO+ |
 | `GET_RHC_TOKENS` | `GET /rhc/tokens` | PRO+ |
+| `GET_RHC_EQUITIES` | `GET /rhc/equities` — beacon-verified tokenized stocks/ETFs | BASIC+ |
 | `GET_RHC_TOKEN` | `GET /rhc/tokens/{address}` | BASIC+ |
 | `GET_RHC_TOKEN_BATCH` | `POST /rhc/token/batch` (max 50) | BASIC+ |
 | `GET_RHC_TOKEN_CANDLES` | `GET /rhc/tokens/{address}/candles` | PRO+ |
@@ -171,6 +175,18 @@ const batch = await client.getTokenBatch(["0x1234…", "0xabcd…"]);
 
 // Batch buyer-quality — MAX 20 addresses, not 50 (per-token cohort computation)
 const scores = await client.getTokenBatchBuyerQuality(["0x1234…", "0xabcd…"]);
+
+// Tokenized equities — identity is the issuer BEACON, never the name (BASIC+)
+const eq = await client.getEquities({ sort: "volume", limit: 20 });
+const nvda = await client.getEquities({ symbol: "NVDA" });
+// eq.data.equities[i] → { symbol, name, token_address, issuer_beacon, price_usd, market_cap_usd,
+//                         liquidity_usd, trades_24h, volume_eth_24h, buyers_24h, sellers_24h, ... }
+
+// Liquidity REMOVALS — the rug signal (PRO+). Removals only; adds are not persisted.
+const lp = await client.getLpEvents({ token: "0x1234567890abcdef1234567890abcdef12345678", limit: 50 });
+// lp.data.events[i] → { event: "remove", dex, provider, provider_is_token_deployer, liquidity,
+//                       amount0, amount1, token_amount_raw, quote_amount_raw (raw uint256 STRINGS), ... }
+// lp.data.coverage.adds_persisted === false; page with { before: lp.data.next_before }
 ```
 
 #### Rule engine (writes)

@@ -6,7 +6,9 @@ import { rhcKolProfileAction } from "./actions/kol-profile.js";
 import { rhcKolCoordinationAction } from "./actions/kol-coordination.js";
 import { rhcKolFirstTouchesAction } from "./actions/kol-first-touches.js";
 import { rhcTradesAction } from "./actions/trades.js";
+import { rhcLpEventsAction } from "./actions/lp-events.js";
 import { rhcTokensAction } from "./actions/tokens.js";
+import { rhcEquitiesAction } from "./actions/equities.js";
 import { rhcTokenAction } from "./actions/token.js";
 import { rhcTokenBatchAction } from "./actions/token-batch.js";
 import { rhcTokenCandlesAction } from "./actions/token-candles.js";
@@ -44,7 +46,7 @@ export const RHC_CLIENT_KEY = "robinhood-chain:client";
 export const robinhoodChainPlugin: Plugin = {
   name: "robinhood-chain",
   description:
-    "Query Robinhood Chain (chain id 4663) trading intelligence from MadeOnSol: EVM-native KOL trades, KOL coordination and first touches, token discovery and batch lookups, launch-bundle detection, buyer quality, deployer reputation with trajectory/history/alerts, the DEX trade tape, and smart-money wallet rankings — from a self-hosted RHC node. Also manages the RHC rule engine: copy-trade rules, market-cap price alerts (~15s polled, not sub-second), KOL coordination alerts and first-touch subscriptions, all with per-chain quotas. Data only — rules deliver signals, they never execute a trade.",
+    "Query Robinhood Chain (chain id 4663) trading intelligence from MadeOnSol: EVM-native KOL trades, KOL coordination and first touches, token discovery and batch lookups, beacon-verified tokenized equities (stocks/ETFs), the liquidity-removals (rug) feed, launch-bundle detection, buyer quality, deployer reputation with trajectory/history/alerts, the DEX trade tape, and smart-money wallet rankings — from a self-hosted RHC node. Also manages the RHC rule engine: copy-trade rules, market-cap price alerts (~15s polled, not sub-second), KOL coordination alerts and first-touch subscriptions, all with per-chain quotas. Data only — rules deliver signals, they never execute a trade.",
   actions: [
     rhcKolFeedAction,
     rhcKolLeaderboardAction,
@@ -53,7 +55,9 @@ export const robinhoodChainPlugin: Plugin = {
     rhcKolCoordinationAction,
     rhcKolFirstTouchesAction,
     rhcTradesAction,
+    rhcLpEventsAction,
     rhcTokensAction,
+    rhcEquitiesAction,
     rhcTokenAction,
     rhcTokenBatchAction,
     rhcTokenCandlesAction,
@@ -130,8 +134,12 @@ export type {
   RhcKolFirstTouchesResponse,
   RhcTrade,
   RhcTradesResponse,
+  RhcLpEvent,
+  RhcLpEventsResponse,
   RhcTokenSummary,
   RhcTokensResponse,
+  RhcEquity,
+  RhcEquitiesResponse,
   RhcTokenResponse,
   RhcBatchToken,
   RhcTokenBatchResponse,
@@ -198,7 +206,9 @@ export {
   rhcKolCoordinationAction,
   rhcKolFirstTouchesAction,
   rhcTradesAction,
+  rhcLpEventsAction,
   rhcTokensAction,
+  rhcEquitiesAction,
   rhcTokenAction,
   rhcTokenBatchAction,
   rhcTokenCandlesAction,
