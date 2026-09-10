@@ -1,6 +1,6 @@
 {
   "name": "@madeonsol/plugin-robinhood-chain",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "ElizaOS plugin for Robinhood Chain (chain id 4663) — EVM-native KOL trade intelligence, token discovery & bundle detection, deployer reputation, the DEX trade tape, and the RHC rule engine (copy-trade rules, price alerts, coordination alerts, first-touch subscriptions) from a self-hosted RHC node",
   "repository": {
     "type": "git",
@@ -19,11 +19,13 @@
     "prebuild": "node ../gen-version.mjs",
     "build": "tsc",
     "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node test/smoke.mjs",
     "preflight": "bash ../../scripts/preflight-publish.sh",
     "prepublishOnly": "npm run preflight && npm run build"
   },
   "peerDependencies": {
-    "@elizaos/core": "^1.0.0 || ^2.0.0-alpha.0"
+    "@elizaos/core": "^1.0.0 || ^2.0.0-alpha.0 || >=2.0.3-beta.0 <2.0.4-0"
   },
   "agentConfig": {
     "pluginType": "elizaos:plugin:1.0.0",
@@ -65,6 +67,6 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "@elizaos/core": "^2.0.0-alpha.77"
+    "@elizaos/core": "2.0.3-beta.7"
   }
 }
