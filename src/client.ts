@@ -1532,6 +1532,15 @@ export class RobinhoodChainClient {
     );
   }
 
+  /** First buyers of a token, ranked, with still-holding status. Previously only readable as a count inside a wallet profile. Added 2026-09-10. */
+  getTokenEarlyBuyers(address: string, params: { limit?: number } = {}) {
+    return this.restRequest<unknown>(
+      "GET",
+      `/rhc/tokens/${encodeURIComponent(address)}/early-buyers`,
+      params,
+    );
+  }
+
   /**
    * Net buy/sell flow by mutually-exclusive trader cohort. `net_eth = sell − buy`,
    * so POSITIVE means the cohort distributed (PRO+). GET /rhc/tokens/{address}/flow
