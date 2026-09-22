@@ -105,7 +105,7 @@ export const rhcPriceAlertsAction: Action = {
     );
 
     callback?.({
-      text: `Robinhood Chain price alerts (${lines.length}) — evaluated on a ~15s poll, not sub-second:\n${lines.join("\n") || "None yet — create one with the typed client's createPriceAlert()."}`,
+      text: `Robinhood Chain price alerts (${lines.length}) — event-driven off each RHC trade (a few seconds), not sub-second:\n${lines.join("\n") || "None yet — create one with the typed client's createPriceAlert()."}`,
       content: toContent(data),
     });
     return undefined;

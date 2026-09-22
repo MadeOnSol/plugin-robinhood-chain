@@ -1177,8 +1177,19 @@ export interface RhcPriceAlertResponse {
 export interface RhcPriceAlertCreatedResponse extends RhcPriceAlertResponse {
   /** null when delivery_mode is `websocket`. Shown once. */
   webhook_secret: string | null;
-  /** RHC alerts are POLLED (~15s), NOT sub-second like the Solana alerts. */
-  evaluation: { mode: "polled"; interval_seconds: number; note: string };
+  /**
+   * RHC alerts are event-driven off `rhc:dex_trade` since 2026-09-15 (price-table
+   * polls are the safety net) — a few seconds, NOT sub-second like the Solana
+   * alerts. Older servers answered `mode: "polled"`.
+   */
+  evaluation: {
+    mode: "event_driven" | "polled";
+    trigger?: string;
+    /** Kept for compatibility: now the fast fallback poll (was the 15 s poll interval). */
+    interval_seconds: number;
+    fallback_poll_seconds?: { fast: number; slow: number };
+    note: string;
+  };
   note: string;
 }
 
@@ -2015,9 +2026,9 @@ export class RobinhoodChainClient {
    * the alert is a delta from the moment you set it; the token must already be
    * tracked with a market cap or the call 400s.
    *
-   * RHC alerts are evaluated on a ~15s POLL of `rhc_token_prices`, not a live
-   * price loop — effective latency is that interval plus the token's own
-   * price-update cadence. This is NOT parity with the sub-second Solana alerts.
+   * RHC alerts are evaluated as trades land on the `rhc:dex_trade` feed, with a
+   * price-table poll (5 s while the feed is degraded, 60 s otherwise) as the
+   * safety net — a few seconds, NOT parity with the sub-second Solana alerts.
    * POST /rhc/price-alerts
    */
   createPriceAlert(input: {

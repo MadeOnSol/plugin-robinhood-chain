@@ -13,6 +13,8 @@
 
 > **0.5.0** — version alignment with the wider RHC SDK release: the stream channel names were corrected in the TS/Python/Rust SDKs (the RHC firehose channel is `rhc:dex_trades`; the server accepts `rhc:trades` only as a deprecated alias of it). This plugin's actions are REST-only, so nothing here changed behavior.
 
+> **New in 0.10.1 — RHC price-alert copy and types.** RHC price alerts have been event-driven off each `rhc:dex_trade` since 2026-09-15 (price-table polls are the safety net), so the create response's `evaluation` now says `mode: "event_driven"` with `trigger` and `fallback_poll_seconds`; the `RhcPriceAlertCreatedResponse.evaluation` type accepts both `"event_driven"` and the legacy `"polled"`, and the action/plugin descriptions no longer claim a ~15 s poll.
+
 > **New in 0.9.0 — a real registration bug fixed, plus early buyers.** An internal agentic-infra audit found `getTokenTopTraders`/`getTokenFlow`/`getTokenPeakHistory`/`getTokenRisk`/`getTokenHolders` were never actually broken here — but did find and fix the equivalent bug in `solana-agent-kit-plugin-robinhood-chain` (5 tool functions exported but never imported into the plugin object, unreachable via `plugin.methods` despite existing in the package). This client's own addition: `getTokenEarlyBuyers` (`GET /rhc/tokens/{address}/early-buyers`) — first buyers of a token, ranked, with still-holding status, previously unreachable from any agent surface.
 >
 > **New in 0.8.0 — tokenized equities + the liquidity-removals feed.** Two new actions / client methods. `GET_RHC_EQUITIES` / `client.getEquities()` (`GET /rhc/equities`, **BASIC+**) lists every official Robinhood tokenized stock and ETF (NVDA, SPY, AAPL, …) with live price / MC / liquidity and 24h trades, ETH volume and buyer-seller split, sortable by `volume` / `trades` / `market_cap` / `last_trade` / `symbol`, filterable by exact `symbol` or substring `q`. **Identity is the issuer beacon, never the name**: a token is listed only if its contract is an EIP-1967 beacon proxy on Robinhood's issuer beacon `0xe10b6f6b…151b00`, read from our own node — on ship day there were 20 fake "GameStop • Robinhood Token" contracts and 8 fake NVDAs with the exact official suffix, and none of them appear. `GET_RHC_LP_EVENTS` / `client.getLpEvents()` (`GET /rhc/lp-events`, **PRO+**) is the rug signal: Uniswap v2/v3 `Burn` and v4 `ModifyLiquidity` with a negative delta on tracked pools, from our node's log subscription, filterable by `token` / `pool` / `provider` / `dex` and cursor-paginated on `next_before`. **Removals only** — adds are not persisted (the response's `coverage` block says `adds_persisted: false`), amounts are raw uint256 **strings**, v4 rows carry `liquidity` only, and `provider_is_token_deployer` is the classic rug tell. Data since 2026-08-05.
@@ -103,7 +105,7 @@ The four `MANAGE_*` actions list your rules by default, and pause / resume / del
 
 Three RHC-specific behaviours worth knowing before you build on these:
 
-- **Price alerts are polled (~15s), not sub-second.** RHC prices are written by `rhc-dex-stream` on a separate box and emit no notification, so the evaluator polls. Effective latency is that ~15s interval *plus* the token's own price-update cadence. The Solana price alerts fire sub-second; assuming parity will mis-size a strategy. Alerts also expire 30 days after creation, and `token_address` / `drop_pct` / `recovery_pct` are immutable (delete and recreate to change a threshold).
+- **Price alerts are event-driven, but not sub-second.** Since 2026-09-15 they are evaluated as trades land on the `rhc:dex_trade` feed, with a price-table poll (5 s while the feed is degraded, 60 s otherwise) and a trade-tape replay as safety nets. Latency is a few seconds (the chain trade flush is ~2 s). The Solana price alerts fire sub-second; assuming parity will mis-size a strategy. Alerts also expire 30 days after creation, and `token_address` / `drop_pct` / `recovery_pct` are immutable (delete and recreate to change a threshold).
 - **RHC copy-trade has no market-cap band.** The producer's event carries no market cap, so a `min_mc_usd` / `max_mc_usd` filter could only be a per-event lookup in the hot path of a ~3.3M trades/day chain. It is omitted rather than shipped as a filter that silently never matches. Amounts are ETH (`min_trade_eth`, `sizing_amount`), not SOL.
 - **Coordination scores: `quality` is real, `earliness` is defaulted.** The v1 scorer is shared with Solana so the number is comparable, but RHC has no early-entry equivalent, so that component is defaulted to 50 while `quality` uses the real KOL 7-day win rate. Each fired signal records which components were real in `score_inputs`. Likewise, first-touch filters offer `min_kol_winrate` and `strategy` instead of Solana's `min_scout_tier` / `min_n_touches` — RHC has no scout score, and a filter that silently matched nothing would be worse than its absence.
 
@@ -215,14 +217,14 @@ const rule = await client.createCopytradeSubscription({
 const signals = await client.getCopytradeSignals({ subscription_id: rule.data!.subscription.id });
 
 // Price alert — market-cap denominated, baseline captured NOW.
-// Evaluated on a ~15s POLL, not sub-second like the Solana alerts.
+// Event-driven off each RHC trade (a few seconds), not sub-second like the Solana alerts.
 const alert = await client.createPriceAlert({
   token_address: "0x1234567890abcdef1234567890abcdef12345678",
   drop_pct: 30,
   recovery_pct: 15, // optional second leg, measured off the dip low
   delivery_mode: "websocket",
 });
-// alert.data.evaluation → { mode: "polled", interval_seconds: 15, note }
+// alert.data.evaluation → { mode: "event_driven", trigger: "rhc:dex_trade", interval_seconds: 5, fallback_poll_seconds: { fast: 5, slow: 60 }, note }
 
 // Dip / recovery history (30-day retention)
 const events = await client.getPriceAlertEvents({ event_type: "dip", limit: 100 });
