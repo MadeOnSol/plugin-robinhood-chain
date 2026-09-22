@@ -467,9 +467,12 @@ export interface RhcBuyerQualityResponse {
   chain: "robinhood";
   token_address: string;
   current_mc_usd: number | null;
+  /** Audit 2026-09-21 — how the first-20 cohort was selected. */
+  cohort_selection?: "distinct_first_buy" | "legacy_row_window";
   quality: {
     score: number;
-    confidence: "low" | "medium" | "high";
+    /** "insufficient_data" when no buyer's win rate fed the score. */
+    confidence: "insufficient_data" | "low" | "medium" | "high";
     signal: "positive" | "neutral" | "negative";
     breakdown: {
       early_buyers_analyzed: number;
