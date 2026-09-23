@@ -68,6 +68,44 @@ export interface RhcKolTrade {
   traded_at: string;
 }
 
+/**
+ * WebSocket payload types (WS Phase 2, 2026-09-22) — the plugin does not open
+ * sockets itself, but agents that pair it with the `robinhood-chain-x402`
+ * stream client get the same shapes here. `rhc:dex_trade` frames carry exact
+ * `*_raw` amounts (decimal strings, never floats), both identities,
+ * metadata / price / mc status and `side` + `side_reason`; `rhc:token_price`
+ * ticks (channel `rhc:token_prices`, address-scoped, one snapshot per address
+ * then ≤ 1 tick per address per 250 ms) carry `quality` fresh | stale |
+ * unreliable — a stale or unreliable price is never delivered as fresh.
+ */
+export interface RhcSideIdentity { address: string | null; symbol: string | null; decimals: number | null }
+export interface RhcDexTradeEvent {
+  chain: "robinhood"; token_address: string; token_symbol: string | null; action: "buy" | "sell"; dex: string; pool: string;
+  eth_amount: number | null; price_usd: number | null; mc_usd: number | null; liquidity_usd: number | null; trader: string | null;
+  tx_hash: string; log_index: number; block_number: number; traded_at: string;
+  amount_in_raw: string | null; amount_out_raw: string | null; token_amount_raw: string | null; quote_amount_raw: string | null;
+  token: RhcSideIdentity; quote: RhcSideIdentity & { usd: number | null; observed_at: string | null };
+  token_decimals: number | null; quote_decimals: number | null;
+  metadata_status: "known" | "pending" | "unknown";
+  price_status: "fresh" | "stale" | "none";
+  price_source: "swap_quote" | "pool_state_quote" | null;
+  price_observed_at: string | null;
+  mc_status: "ok" | "no_price" | "no_supply" | "dust" | "ceiling" | "liquidity_gate" | "no_liquidity" | null;
+  side: "buy" | "sell" | null;
+  side_reason: "both_sides_quote" | "no_recognized_quote" | null;
+  launchpad: string | null;
+}
+export interface RhcTokenPriceTick {
+  chain: "robinhood"; address: string; symbol: string | null; price_usd: number | null; price_native: number | null;
+  market_cap_usd: number | null; liquidity_usd: number | null; source_pool: string | null; source_dex: string | null;
+  observed_at: string | null; price_age_ms: number | null;
+  quality: "fresh" | "stale" | "unreliable";
+  quality_reason: "no_price" | "dust_trade" | "curve_live" | "state_quote_fallback" | "low_liquidity" | "price_age" | "mc_ceiling" | null;
+  price_source: "swap_quote" | "pool_state_quote" | null;
+  tx_hash: string | null; log_index: number | null; block_number: number | null;
+  source: "rhc_token_prices" | "rhc-dex-stream:trade";
+}
+
 export interface RhcKolFeedResponse {
   chain: "robinhood";
   trades: RhcKolTrade[];
@@ -1099,6 +1137,12 @@ export interface RhcCopytradeSubscription {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  /** Subset of source_wallets in the tracked KOL set (kol_evm_wallets) — only these can ever fire. null if the reference read failed. Added 2026-09-22. */
+  source_wallets_tracked?: string[] | null;
+  /** Subset of source_wallets that can NEVER fire (not tracked). */
+  source_wallets_untracked?: string[] | null;
+  /** Present only when something needs attention (untracked_source_wallets / source_wallet_tracking_unavailable). */
+  warnings?: { code: "untracked_source_wallets" | "source_wallet_tracking_unavailable"; message: string }[];
 }
 
 export interface RhcCopytradeSubscriptionsResponse {
@@ -1109,6 +1153,8 @@ export interface RhcCopytradeSubscriptionsResponse {
 export interface RhcCopytradeSubscriptionResponse {
   chain: "robinhood";
   subscription: RhcCopytradeSubscription;
+  /** Mirror of `subscription.warnings` (create / get one / update) — present only when there is something to say. */
+  warnings?: { code: "untracked_source_wallets" | "source_wallet_tracking_unavailable"; message: string }[];
 }
 
 /** Create response — `webhook_secret` is returned ONCE and never again. */

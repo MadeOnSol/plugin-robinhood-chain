@@ -202,7 +202,8 @@ const lp = await client.getLpEvents({ token: "0x1234567890abcdef1234567890abcdef
 // The rule delivers a SUGGESTED size; it never places an order.
 const rule = await client.createCopytradeSubscription({
   name: "elite RHC wallets",
-  source_wallets: ["0x1234…", "0xabcd…"], // lowercased server-side
+  source_wallets: ["0x1234…", "0xabcd…"], // lowercased server-side; must be TRACKED KOL wallets (/rhc/kol/wallets) —
+                                          // untracked ones never fire: see rule.data.subscription.source_wallets_untracked + rule.data.warnings
   min_trade_eth: 0.05,
   only_action: "buy",
   sizing_mode: "proportional",
