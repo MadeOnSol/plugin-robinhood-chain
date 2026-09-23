@@ -136,6 +136,8 @@ export type {
   RhcTradesResponse,
   RhcLpEvent,
   RhcLpEventsResponse,
+  RhcLpStreamEvent,
+  RhcTokenUnlockScheduleEvent,
   RhcTokenSummary,
   RhcTokensResponse,
   RhcEquity,

@@ -105,6 +105,34 @@ export interface RhcTokenPriceTick {
   tx_hash: string | null; log_index: number | null; block_number: number | null;
   source: "rhc_token_prices" | "rhc-dex-stream:trade";
 }
+/**
+ * WS Phase 3 (2026-09-23). `rhc:lp_event` (channel `rhc:lp_events`, ULTRA+):
+ * liquidity add / remove / pool_created; `in_range` / `active_*` are null
+ * (`active_share_reason: "pool_state_unknown"`) when the pool's tick was not
+ * known; `amount0` / `amount1` are null on v4; `provider` is usually a router /
+ * position manager; no USD field. Unlock-schedule events on `rhc:token_locks`
+ * (opt-in `filters.lifecycle: true`): `available` = claimable per the
+ * schedule, NOT claimed; RHC claims / cancels are not observable.
+ */
+export interface RhcLpStreamEvent {
+  chain: "robinhood"; action: "add" | "remove" | "pool_created"; dex: "uniswap-v2" | "uniswap-v3" | "uniswap-v4"; pool: string;
+  token_address: string | null; token: RhcSideIdentity; token0: string | null; token1: string | null; provider: string | null;
+  liquidity: string | null; amount0: string | null; amount1: string | null;
+  tick_lower: number | null; tick_upper: number | null; liquidity_delta: string | null;
+  in_range: boolean | null; active_liquidity_delta: string | null; active_share: number | null;
+  active_share_reason: "pool_created" | "not_concentrated" | "pool_state_unknown" | "no_active_liquidity" | null;
+  share_of_reserves: number | null; material: boolean | null;
+  block_number: number | null; block_time: string | null; tx_hash: string; log_index: number | null;
+}
+export interface RhcTokenUnlockScheduleEvent {
+  event_key: string; lock_id: string; token_address: string; family: string; observed_at: string | null;
+  unlock_at: string; unlock_kind: "cliff" | "final" | "tranche";
+  amount_raw: string | null; amount_reason: string | null; unlocked_total_raw: string | null;
+  release_model: "at_end" | "linear" | "tranched"; claimable?: true;
+  chain: "robinhood"; locker: string | null; kind: string | null; subject: string | null; lp_kind: string | null; lp_pool: string | null;
+  sender: string | null; recipient: string | null; locked_amount_raw: string | null; amount_unit: string | null;
+  decimals: number | null; withdrawals_tracked: false;
+}
 
 export interface RhcKolFeedResponse {
   chain: "robinhood";
@@ -284,10 +312,11 @@ export interface RhcTradesResponse {
   next_before: string | null;
 }
 
-/** One liquidity REMOVAL (GET /rhc/lp-events). Every row is `event: "remove"` —
- *  adds are not persisted. Raw amounts are uint256 decimal STRINGS. */
+/** One liquidity event (GET /rhc/lp-events). Without `action` every row is
+ *  `event: "remove"` (the default feed is removals only); `action` opts into
+ *  adds / pool creations (2026-09-23). Raw amounts are uint256 decimal STRINGS. */
 export interface RhcLpEvent {
-  event: "remove";
+  event: "remove" | "add" | "pool_created";
   pool: string;
   dex: "uniswap-v2" | "uniswap-v3" | "uniswap-v4";
   fee_tier: number | null;
@@ -319,6 +348,16 @@ export interface RhcLpEvent {
   block_time: string;
   tx_hash: string;
   log_index: number;
+  /** Depth fields (2026-09-23; null where the pool state was unknown and on older rows). */
+  tick_lower?: number | null;
+  tick_upper?: number | null;
+  liquidity_delta?: string | null;
+  in_range?: boolean | null;
+  active_liquidity_delta?: string | null;
+  active_share?: number | null;
+  share_of_reserves?: number | null;
+  /** true = a removal of ≥ 25 % of reserves / active liquidity. */
+  material?: boolean | null;
 }
 
 export interface RhcLpEventsResponse {
@@ -1497,6 +1536,8 @@ export class RobinhoodChainClient {
    * Amounts are raw uint256 STRINGS; v4 rows carry `liquidity` only.
    * `provider_is_token_deployer` is the classic rug tell. Cursor via
    * `next_before` (same opaque keyset as getTrades). Data since 2026-08-05 (PRO+).
+   * Since 2026-09-23 `action` opts into adds (kept 7 days) / pool creations —
+   * the default stays removals only — and rows carry the depth fields.
    * GET /rhc/lp-events
    */
   getLpEvents(params?: {
@@ -1505,6 +1546,7 @@ export class RobinhoodChainClient {
     pool?: string;
     provider?: string;
     dex?: "uniswap-v2" | "uniswap-v3" | "uniswap-v4";
+    action?: "remove" | "add" | "pool_created" | "all";
     before?: string;
   }) {
     return this.restRequest<RhcLpEventsResponse>("GET", "/rhc/lp-events", params);
