@@ -133,6 +133,60 @@ export interface RhcTokenUnlockScheduleEvent {
   sender: string | null; recipient: string | null; locked_amount_raw: string | null; amount_unit: string | null;
   decimals: number | null; withdrawals_tracked: false;
 }
+/**
+ * WS Phase 4 (2026-09-23), all PRO+ and scoped (per-connection cap PRO 25 /
+ * ULTRA 100 / BUSINESS 250, rejected, never truncated). `rhc:token_candles`
+ * (`filters.addresses`, opt-in `filters.updates`): `rhc:candle_closed` /
+ * `rhc:candle_revised` carry the stored 1-minute row (revision 0 = the close,
+ * n > 0 = a rewrite), `rhc:candle_update` the in-progress minute (state
+ * stream, no id). `rhc:token_risk` (`filters.addresses`):
+ * `rhc:risk_verdict_changed` + an `rhc:risk_verdict` snapshot; score HIGHER =
+ * SAFER; the change happened in (previous_checked_at, checked_at].
+ * `rhc:wallet_scores` (`filters.wallets`, 0x deployers):
+ * `rhc:deployer_tier_changed` ("recomputed at T", not "changed at T").
+ */
+export interface RhcCandleClosedEvent {
+  chain: "robinhood"; address: string; bucket_start: string; bucket_end: string; closed_at: string | null;
+  revision: number; revised_at: string | null;
+  open_price_usd: number | null; high_price_usd: number | null; low_price_usd: number | null; close_price_usd: number | null;
+  open_mc_usd: number | null; high_mc_usd: number | null; low_mc_usd: number | null; close_mc_usd: number | null;
+  close_liquidity_usd: number | null; close_supply: number | null;
+  volume_usd: number | null; buy_volume_usd: number | null; sell_volume_usd: number | null;
+  trades: number | null; buy_count: number | null; sell_count: number | null; dex: string | null; pool_address: string | null;
+  final: true; source: "rhc_ohlc_1m";
+}
+export interface RhcCandleUpdateEvent {
+  chain: "robinhood"; address: string; bucket_start: string; bucket_end: string;
+  open_price_usd: number | null; high_price_usd: number | null; low_price_usd: number | null; close_price_usd: number | null;
+  close_mc_usd: number | null; volume_usd: number | null; trades: number | null;
+  final: false; as_of: string | null; source: "rhc-dex-stream:open_candle";
+}
+export interface RhcRiskVerdict {
+  score: number | null; sellable: boolean | null; sellable_reason: string | null; proxy_kind: string | null;
+  upgradeable: boolean | null; owner_model: string | null; can_mint: boolean | null; can_pause: boolean | null;
+  lp_custody: string | null; lp_burned_pct: number | null; code_size: number | null; flags: string[];
+}
+export interface RhcRiskVerdictChangedEvent {
+  chain: "robinhood"; token_address: string; event_key: string; changed: string[];
+  flags_added: string[]; flags_removed: string[]; before: RhcRiskVerdict; after: RhcRiskVerdict;
+  checked_at: string; previous_checked_at: string | null; score_semantics: "higher_is_safer";
+  detection: { method: "recheck_sweep"; recheck_target_hours: number; sweep_interval_minutes: number; min_liquidity_usd: number; note: string };
+  written_at: string; source: "rhc_token_risk";
+}
+export interface RhcRiskVerdictSnapshot {
+  chain: "robinhood"; token_address: string; assessed: boolean; verdict: RhcRiskVerdict | null;
+  checked_at: string | null; score_semantics: "higher_is_safer"; source: "rhc_token_risk";
+}
+export interface RhcDeployerTierChangedEvent {
+  event_key: string; chain: "robinhood"; address: string;
+  tier_before: "elite" | "good" | "spammer" | "neutral" | null; tier_after: "elite" | "good" | "spammer" | "neutral" | null;
+  first_appearance: boolean;
+  stats: {
+    tokens_deployed: number | null; graduated: number | null; graduation_rate: number | null; runners: number | null;
+    runner_rate: number | null; best_peak_mc_usd: number | null; first_deploy_at: string | null; last_deploy_at: string | null;
+  } | null;
+  computed_at: string; source: "matview_refresh"; matview: "mv_rhc_deployers";
+}
 
 export interface RhcKolFeedResponse {
   chain: "robinhood";
