@@ -19,7 +19,7 @@ const eth = (n: number | null | undefined, dp = 3) => (n == null ? "?" : `${Numb
 export const rhcWalletPositionsAction: Action = {
   name: "GET_RHC_WALLET_POSITIONS",
   description:
-    "What a Robinhood Chain wallet is holding right now — open FIFO positions marked to the current price, with cost basis, unrealized PnL and liquidity context. PRO+.",
+    "What a Robinhood Chain wallet is holding right now — open FIFO positions marked to the current price, with cost basis, unrealized PnL and liquidity context, each checked against the chain (HELD / PARTIALLY_REDUCED / TRANSFERRED_OR_DISPOSED / EXTERNAL_INFLOW / BALANCE_UNVERIFIED). PRO+.",
   similes: [
     "robinhood chain wallet positions",
     "rhc holdings",
@@ -69,13 +69,21 @@ export const rhcWalletPositionsAction: Action = {
           : "unpriced";
         // Flag the virtual-ceiling case inline — it changes how the number should be read.
         const liq = p.liquidity_basis === "v4_virtual_ceiling" ? " [liq = curve ceiling, not TVL]" : "";
-        return `  ${label}: cost ${eth(p.cost_basis_eth)} → ${unreal}${liq}`;
+        // A FIFO-open position is not a balance: say what the chain shows.
+        const held = p.holding_status ? ` [${p.holding_status}]` : "";
+        return `  ${label}: cost ${eth(p.cost_basis_eth)} → ${unreal}${liq}${held}`;
       });
 
     const lines = [
       `Robinhood Chain open positions for ${address.slice(0, 10)}… (${s.open_positions})`,
       `Cost basis ${eth(s.total_cost_basis_eth)} · value ${eth(s.total_current_value_eth)} · unrealized ${eth(s.total_unrealized_eth)}`,
     ];
+    const h = s.holdings;
+    if (h) {
+      lines.push(
+        `On-chain check: ${h.held + h.partially_reduced + h.external_inflow} still held, ${h.transferred_or_disposed} transferred or disposed, ${h.unverified} unverified · verified value ${eth(h.verified_value_eth)}`,
+      );
+    }
     if (rows.length) lines.push(...rows);
     if (s.unpriced_positions > 0) {
       lines.push(`Note: ${s.unpriced_positions} position(s) have no current price and are excluded from the value and unrealized totals.`);

@@ -13,6 +13,8 @@
 
 > **0.5.0** — version alignment with the wider RHC SDK release: the stream channel names were corrected in the TS/Python/Rust SDKs (the RHC firehose channel is `rhc:dex_trades`; the server accepts `rhc:trades` only as a deprecated alias of it). This plugin's actions are REST-only, so nothing here changed behavior.
 
+> **New in 0.14.0:** RHC wallet and positions answers report the on-chain check (`holding_status` per position, still held vs transferred, verified value) instead of presenting FIFO-open positions as current holdings; copy-trade rules are typed with `operational_state`.
+
 > **New in 0.10.1 — RHC price-alert copy and types.** RHC price alerts have been event-driven off each `rhc:dex_trade` since 2026-09-15 (price-table polls are the safety net), so the create response's `evaluation` now says `mode: "event_driven"` with `trigger` and `fallback_poll_seconds`; the `RhcPriceAlertCreatedResponse.evaluation` type accepts both `"event_driven"` and the legacy `"polled"`, and the action/plugin descriptions no longer claim a ~15 s poll.
 
 > **New in 0.9.0 — a real registration bug fixed, plus early buyers.** An internal agentic-infra audit found `getTokenTopTraders`/`getTokenFlow`/`getTokenPeakHistory`/`getTokenRisk`/`getTokenHolders` were never actually broken here — but did find and fix the equivalent bug in `solana-agent-kit-plugin-robinhood-chain` (5 tool functions exported but never imported into the plugin object, unreachable via `plugin.methods` despite existing in the package). This client's own addition: `getTokenEarlyBuyers` (`GET /rhc/tokens/{address}/early-buyers`) — first buyers of a token, ranked, with still-holding status, previously unreachable from any agent surface.
@@ -46,7 +48,7 @@ const agent = {
 
 ## Authentication
 
-This plugin is **key-mode only** — a single MadeOnSol API key (`msk_`, Bearer). Robinhood Chain does have a keyless x402 pay-per-call rail (a narrow 6-endpoint subset, dual-accept USDG-on-RHC or USDC-on-Solana — see [madeonsol.com/robinhood/x402](https://madeonsol.com/robinhood/x402)), but it is **not** wired into this plugin.
+This plugin is **key-mode only** — a single MadeOnSol API key (`msk_`, Bearer). Robinhood Chain does have a keyless x402 pay-per-call rail (a narrow keyless subset, listed live at `/api/x402/rhc`, dual-accept USDG-on-RHC or USDC-on-Solana — see [madeonsol.com/robinhood/x402](https://madeonsol.com/robinhood/x402)), but it is **not** wired into this plugin.
 
 | Setting | Notes |
 |---|---|
@@ -212,7 +214,9 @@ const rule = await client.createCopytradeSubscription({
   webhook_url: "https://your-app.example/rhc-copytrade",
 });
 // rule.data.webhook_secret is shown ONCE — store it. Payloads are signed
-// HMAC-SHA256 over `<timestamp>.<body>` in X-MadeOnSol-Signature.
+// Lowercase hex HMAC-SHA256 (no prefix) over `<timestamp>.<rawBody>` in
+// X-MadeOnSol-Signature; <timestamp> = X-MadeOnSol-Timestamp, unix MILLISECONDS;
+// key = the webhook_secret string exactly as returned (do not hex-decode it).
 
 // Catch-up after a missed webhook (7-day retention)
 const signals = await client.getCopytradeSignals({ subscription_id: rule.data!.subscription.id });

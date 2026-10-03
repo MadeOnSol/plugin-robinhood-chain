@@ -82,6 +82,11 @@ export const rhcWalletAction: Action = {
     }
     if (s.partial) lines.push("Note: hit the per-wallet trade cap — figures cover part of the window only.");
     if (d.stats_unavailable) lines.push("Note: the PnL snapshot timed out; only the reputation flags are reliable here.");
+    // "open" is FIFO (unmatched DEX buys), not a balance: report the on-chain check.
+    const h = d.holdings;
+    if (h) {
+      lines.push(`On-chain: ${h.held + h.partially_reduced + h.external_inflow} of ${h.fifo_open_positions} open positions still held (${h.transferred_or_disposed} transferred or disposed, ${h.unverified} unverified) · verified value ${eth(h.verified_value_eth)}`);
+    }
 
     callback?.({ text: lines.join("\n"), content: toContent(d) });
     return undefined;

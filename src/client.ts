@@ -8,7 +8,7 @@
  *
  * Everything here is EVM-native: `token_address`/`0x` addresses (lowercase),
  * `eth_amount`, `tx_hash`, `block_number`, `net_flow_eth`. There are no Solana
- * field names. The x402 pay-per-call rail is live on Robinhood Chain too (6 keyless endpoints), but its signing path is NOT available
+ * field names. The x402 pay-per-call rail is live on Robinhood Chain too (a narrow keyless subset, listed live at /api/x402/rhc), but its signing path is NOT available
  * on Robinhood Chain — key auth only.
  */
 
@@ -999,8 +999,10 @@ export interface RhcWalletProfileResponse {
     realized_pnl_eth: number;
     unrealized_pnl_eth: number;
     total_pnl_eth: number;
+    /** FIFO figure, NOT an on-chain balance — see `holdings.verified_value_eth`. */
     held_value_eth: number;
     unique_tokens: number;
+    /** FIFO-open positions; how many are still held is in `holdings`. */
     open_positions: number;
     window_days: number;
     partial: boolean;
@@ -1029,9 +1031,43 @@ export interface RhcWalletProfileResponse {
     avg_trade_size_eth: number | null;
     is_active: boolean;
   };
+  /**
+   * Server 2026-10-02 — on-chain check of every FIFO-open position (balanceOf on
+   * our own node). `top_tokens[].holding_status` is the per-token status (null when
+   * FIFO-closed). null when the snapshot was unavailable; absent on older servers.
+   */
+  holdings?: RhcHoldingsSummary | null;
   /** `true` when the snapshot timed out — `flags` still resolve. */
   stats_unavailable: boolean;
   cache_hit: boolean;
+}
+
+/**
+ * On-chain status of a FIFO-open position (server 2026-10-02). HELD = within 0.5 %
+ * of FIFO; TRANSFERRED_OR_DISPOSED = balance 0; EXTERNAL_INFLOW = more than was
+ * bought (no cost basis for the excess); BALANCE_UNVERIFIED = read failed (no value,
+ * never assumed held).
+ */
+export type RhcHoldingStatus = "HELD" | "PARTIALLY_REDUCED" | "TRANSFERRED_OR_DISPOSED" | "EXTERNAL_INFLOW" | "BALANCE_UNVERIFIED";
+
+export interface RhcHoldingsSummary {
+  balance_source: "rhc_node_multicall3";
+  checked_at: string;
+  /** false when any position is BALANCE_UNVERIFIED. */
+  complete: boolean;
+  fifo_open_positions: number;
+  held: number;
+  partially_reduced: number;
+  transferred_or_disposed: number;
+  external_inflow: number;
+  unverified: number;
+  /** Proven balances x current price; unverified and unpriced add nothing. */
+  verified_value_eth: number;
+  unpriced_held: number;
+  cost_basis_held_eth: number;
+  unrealized_known_eth: number;
+  /** Cost basis of FIFO lots no longer held; outcome unknown. */
+  cost_basis_not_held_eth: number;
 }
 
 export interface RhcOpenPosition {
@@ -1111,8 +1147,22 @@ export interface RhcWalletPositionsResponse {
     total_unrealized_eth: number;
     /** Excluded from the value/unrealized totals. */
     unpriced_positions: number;
+    /** Server 2026-10-02 — proven holdings; absent on older servers. */
+    holdings?: RhcHoldingsSummary;
   };
-  positions: RhcOpenPosition[];
+  positions: (RhcOpenPosition & {
+    /** Server 2026-10-02 (absent on older servers): the on-chain check of this FIFO position. */
+    fifo_unmatched_amount?: number | null;
+    current_onchain_balance?: number | null;
+    holding_status?: RhcHoldingStatus;
+    holding_unverified_reason?: string | null;
+    held_known_amount?: number | null;
+    external_inflow_amount?: number | null;
+    current_holding_value_eth?: number | null;
+    cost_basis_held_eth?: number | null;
+    unrealized_known_eth?: number | null;
+    cost_basis_not_held_eth?: number | null;
+  })[];
 }
 
 export interface RhcWalletTrade {
@@ -1236,6 +1286,8 @@ export interface RhcCopytradeSubscription {
   source_wallets_untracked?: string[] | null;
   /** Present only when something needs attention (untracked_source_wallets / source_wallet_tracking_unavailable). */
   warnings?: { code: "untracked_source_wallets" | "source_wallet_tracking_unavailable"; message: string }[];
+  /** Server 2026-10-02 — can the rule fire at all (separate from is_active)? no_tracked_sources = kept but never fires; unknown = tracking read failed. */
+  operational_state?: "eligible" | "no_tracked_sources" | "unknown";
 }
 
 export interface RhcCopytradeSubscriptionsResponse {
