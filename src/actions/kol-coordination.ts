@@ -9,12 +9,12 @@ function getClient(runtime: IAgentRuntime): RobinhoodChainClient {
 
 const AUTH_HINT = "Authentication required. Set ROBINHOOD_CHAIN_API_KEY (or MADEONSOL_API_KEY) — get a free `msk_` key at https://madeonsol.com/pricing.";
 
-const PERIODS = ["1h", "6h", "24h", "7d"] as const;
+const PERIODS = ["15m", "1h", "6h", "24h", "7d"] as const;
 
 export const rhcKolCoordinationAction: Action = {
   name: "GET_RHC_KOL_COORDINATION",
   description:
-    "Get KOL coordination / clustering on Robinhood Chain — tokens bought by min_kols+ DISTINCT tracked KOLs inside a 1h/6h/24h/7d window, ranked by KOL count then buy ETH. Per token: buy/sell/net ETH, signal (accumulating when net_eth >= 0, else distributing), exited_count vs holders_count, time_to_consensus_sec from first to last KOL buy, MC at the first KOL buy, current/peak MC, liquidity, deployer tier, token age, and the per-KOL breakdown (evm_address, name, twitter_url, buy_eth, sell_eth, exited). Computed read-time from the RHC KOL tape; RHC has no KOL winrate/strategy scores, so those Solana fields are absent. BASIC+.",
+    "Get KOL coordination / clustering on Robinhood Chain — tokens bought by min_kols+ DISTINCT tracked KOLs inside a 15m/1h/6h/24h/7d window, ranked by KOL count then buy ETH. Per token: buy/sell/net ETH, signal (accumulating when net_eth >= 0, else distributing), exited_count vs holders_count, time_to_consensus_sec from first to last KOL buy, MC at the first KOL buy, current/peak MC, liquidity, deployer tier, token age, and the per-KOL breakdown (evm_address, name, twitter_url, buy_eth, sell_eth, exited). Computed read-time from the RHC KOL tape; RHC has no KOL winrate/strategy scores, so those Solana fields are absent. BASIC+.",
   similes: [
     "robinhood chain kol coordination",
     "rhc multiple kols buying same token",

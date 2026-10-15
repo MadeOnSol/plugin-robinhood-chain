@@ -1280,14 +1280,18 @@ export interface RhcCopytradeSubscription {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-  /** Subset of source_wallets in the tracked KOL set (kol_evm_wallets) — only these can ever fire. null if the reference read failed. Added 2026-09-22. */
+  /** Subset of source_wallets in the tracked KOL set (kol_evm_wallets). KOL enrichment under source_admission "any_wallet" (production since 2026-10-04); only these fire under legacy "kol_only". null if the reference read failed. Added 2026-09-22. @deprecated 2026-10-04 (enrichment only). */
   source_wallets_tracked?: string[] | null;
-  /** Subset of source_wallets that can NEVER fire (not tracked). */
+  /** Subset of source_wallets NOT in the tracked KOL set. Fire normally under source_admission "any_wallet"; never under legacy "kol_only". @deprecated 2026-10-04 (enrichment only). */
   source_wallets_untracked?: string[] | null;
-  /** Present only when something needs attention (untracked_source_wallets / source_wallet_tracking_unavailable). */
+  /** Present only when something needs attention (untracked_source_wallets / source_wallet_tracking_unavailable — legacy kol_only engine only). */
   warnings?: { code: "untracked_source_wallets" | "source_wallet_tracking_unavailable"; message: string }[];
-  /** Server 2026-10-02 — can the rule fire at all (separate from is_active)? no_tracked_sources = kept but never fires; unknown = tracking read failed. */
-  operational_state?: "eligible" | "no_tracked_sources" | "unknown";
+  /** Can the rule fire at all (separate from is_active)? Server 2026-10-04, any_wallet: eligible | monitoring_pending | monitoring_unavailable | source_capacity_unavailable. Legacy kol_only: no_tracked_sources = never fires; unknown = tracking read failed. */
+  operational_state?: "eligible" | "monitoring_pending" | "monitoring_unavailable" | "source_capacity_unavailable" | "no_tracked_sources" | "unknown";
+  /** Server 2026-10-04 — which trades the running engine admits. Absent = unknown (legacy). */
+  source_admission?: "kol_only" | "any_wallet";
+  /** Server 2026-10-04 — present only with monitoring_unavailable. */
+  monitoring_reasons?: string[];
 }
 
 export interface RhcCopytradeSubscriptionsResponse {
@@ -1592,7 +1596,7 @@ export class RobinhoodChainClient {
    * GET /rhc/kol/coordination
    */
   getKolCoordination(params?: {
-    period?: "1h" | "6h" | "24h" | "7d";
+    period?: "15m" | "1h" | "6h" | "24h" | "7d";
     min_kols?: number;
     limit?: number;
     /** MC at the FIRST KOL buy. Tokens with unknown MC are dropped when a band is set. */
@@ -1723,6 +1727,70 @@ export class RobinhoodChainClient {
     return this.restRequest<RhcBundleResponse>(
       "GET",
       `/rhc/tokens/${encodeURIComponent(address)}/bundle`,
+    );
+  }
+
+  /**
+   * Every coordinated buy cluster on a token in a window, launch AND later: blocks where at least
+   * `min_wallets` distinct effective trading accounts bought. `summary.baseline` gives buys per
+   * active block, so a cluster is evidence, not a verdict. `include_balances` adds `held_now`
+   * (balanceOf from our node) to the 3 most recent clusters (PRO+). GET /rhc/tokens/{address}/bundles
+   */
+  getTokenBundles(address: string, params: { window?: "1h" | "6h" | "24h"; min_wallets?: number; limit?: number; include_balances?: boolean } = {}) {
+    return this.restRequest<unknown>(
+      "GET",
+      `/rhc/tokens/${encodeURIComponent(address)}/bundles`,
+      params,
+    );
+  }
+
+  /**
+   * One figure: `bundled_pct_of_supply_now`, the share of supply held now by every bundle wallet
+   * (launch bundle plus the window's clusters, each wallet once), balanceOf from our node. Null with
+   * `held_now.incomplete_reason` unless every wallet was read. Cached 30 s (PRO+).
+   * GET /rhc/tokens/{address}/bundle-share
+   */
+  getTokenBundleShare(address: string, params: { window?: "1h" | "6h" | "24h"; min_wallets?: number } = {}) {
+    return this.restRequest<unknown>(
+      "GET",
+      `/rhc/tokens/${encodeURIComponent(address)}/bundle-share`,
+      params,
+    );
+  }
+
+  /**
+   * Every stored KOL trade on one token, newest first, keyset paged with `next_cursor`. BASIC: 5-minute
+   * delay, 20 rows. `include_balances` (PRO+) adds current balanceOf(token) per KOL address on the
+   * page; a failed read is `unverified`, never 0. GET /rhc/tokens/{address}/kol-trades
+   */
+  getTokenKolTrades(address: string, params: { limit?: number; action?: "buy" | "sell"; kol?: string; since?: string; cursor?: string; include_balances?: boolean } = {}) {
+    return this.restRequest<unknown>(
+      "GET",
+      `/rhc/tokens/${encodeURIComponent(address)}/kol-trades`,
+      params,
+    );
+  }
+
+  /**
+   * Scout leaderboard: KOLs whose first touches (a buy of a token no KOL bought before) drew other
+   * KOLs within 4 h, over the last 30 days. `scout_tier` S/A/B/C on `swarm_3plus_pct`; KOLs below
+   * `min_first_touches` (default 30) are left out (PRO+). GET /rhc/kol/scouts/leaderboard
+   */
+  getKolScoutLeaderboard(params: { limit?: number; scout_tier?: "S" | "A" | "B" | "C"; sort?: "scout_score" | "n_first_touches_30d" | "swarm_3plus_pct" | "swarm_5plus_pct" | "avg_followers_4h"; min_first_touches?: number } = {}) {
+    return this.restRequest<unknown>("GET", "/rhc/kol/scouts/leaderboard", params);
+  }
+
+  /**
+   * A developer's launches and own-token buys/sells as one timeline, newest first, keyset paged.
+   * `types` is a comma list of launch, dev_buy, dev_sell; `since` defaults to 30 days (max 90).
+   * `coverage.scan_truncated` + `next_cursor` say where a bounded scan stopped (PRO+).
+   * GET /rhc/deployer-hunter/{address}/activity
+   */
+  getDeployerActivity(address: string, params: { limit?: number; since?: string; types?: string; cursor?: string } = {}) {
+    return this.restRequest<unknown>(
+      "GET",
+      `/rhc/deployer-hunter/${encodeURIComponent(address)}/activity`,
+      params,
     );
   }
 

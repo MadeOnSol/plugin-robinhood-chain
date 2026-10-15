@@ -16,6 +16,11 @@ import { rhcKolConsensusAction } from "./actions/token-kol-consensus.js";
 import { rhcBuyerQualityAction } from "./actions/token-buyer-quality.js";
 import { rhcTokenBatchBuyerQualityAction } from "./actions/token-batch-buyer-quality.js";
 import { rhcTokenBundleAction } from "./actions/token-bundle.js";
+import { rhcTokenBundlesAction } from "./actions/token-bundles.js";
+import { rhcTokenBundleShareAction } from "./actions/token-bundle-share.js";
+import { rhcTokenKolTradesAction } from "./actions/token-kol-trades.js";
+import { rhcKolScoutsAction } from "./actions/kol-scouts.js";
+import { rhcDeployerActivityAction } from "./actions/deployer-activity.js";
 import { rhcDeployerLeaderboardAction } from "./actions/deployer-leaderboard.js";
 import { rhcDeployerProfileAction } from "./actions/deployer-profile.js";
 import { rhcDeployerTrajectoryAction } from "./actions/deployer-trajectory.js";
@@ -65,6 +70,11 @@ export const robinhoodChainPlugin: Plugin = {
     rhcBuyerQualityAction,
     rhcTokenBatchBuyerQualityAction,
     rhcTokenBundleAction,
+    rhcTokenBundlesAction,
+    rhcTokenBundleShareAction,
+    rhcTokenKolTradesAction,
+    rhcKolScoutsAction,
+    rhcDeployerActivityAction,
     rhcDeployerLeaderboardAction,
     rhcDeployerProfileAction,
     rhcDeployerTrajectoryAction,
@@ -224,6 +234,11 @@ export {
   rhcBuyerQualityAction,
   rhcTokenBatchBuyerQualityAction,
   rhcTokenBundleAction,
+  rhcTokenBundlesAction,
+  rhcTokenBundleShareAction,
+  rhcTokenKolTradesAction,
+  rhcKolScoutsAction,
+  rhcDeployerActivityAction,
   rhcDeployerLeaderboardAction,
   rhcDeployerProfileAction,
   rhcDeployerTrajectoryAction,

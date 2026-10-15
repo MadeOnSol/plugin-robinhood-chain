@@ -13,6 +13,10 @@
 
 > **0.5.0** — version alignment with the wider RHC SDK release: the stream channel names were corrected in the TS/Python/Rust SDKs (the RHC firehose channel is `rhc:dex_trades`; the server accepts `rhc:trades` only as a deprecated alias of it). This plugin's actions are REST-only, so nothing here changed behavior.
 
+> **Server update 2026-10-04 (no package change needed): RHC copy-trade rules follow any valid source wallet.** `source_wallets` no longer have to be tracked KOL wallets (`/rhc/kol/wallets`): any valid `0x` wallet fires, KOL membership is optional enrichment, and copy-trade sources do not use Wallet Tracker quota. Each rule reports `source_admission` (`any_wallet`) and `operational_state` (`eligible`, or an infrastructure state `monitoring_pending` / `monitoring_unavailable` / `source_capacity_unavailable`). `source_wallets_tracked` / `source_wallets_untracked`, `no_tracked_sources` and the `untracked_source_wallets` warning are legacy, still filled. Existing rules work without editing. Limits are unchanged: PRO 3 rules × 5 wallets, ULTRA 20 × 50, BUSINESS 100 × 250.
+
+> **New in 0.15.0: bundle clusters, bundle share now, KOL trades per token, scouts and developer activity.** Five actions + client methods (keyed `msk_` API). `GET_RHC_TOKEN_BUNDLES` (`client.getTokenBundles(address, params)`, PRO+): every block in a 1h/6h/24h window where at least `min_wallets` distinct effective trading accounts bought, launch and later; `summary.baseline` shows buys per active block, so a cluster is evidence, not a verdict. `GET_RHC_TOKEN_BUNDLE_SHARE` (`client.getTokenBundleShare(address, params)`, PRO+): `bundled_pct_of_supply_now` from balanceOf on our node; null with `held_now.incomplete_reason` unless every wallet was read. `GET_RHC_TOKEN_KOL_TRADES` (`client.getTokenKolTrades(address, params)`, BASIC+ with a 5-minute delay and 20 rows; `include_balances` is PRO+ and never reports a failed read as 0). `GET_RHC_KOL_SCOUTS` (`client.getKolScoutLeaderboard(params)`, PRO+): KOLs whose first touches drew other KOLs within 4 hours, 30 days. `GET_RHC_DEPLOYER_ACTIVITY` (`client.getDeployerActivity(address, params)`, PRO+): a developer's launches and own-token buys/sells as one paged timeline (30 days by default, at most 90; `coverage.scan_truncated` says where a bounded scan stopped).
+
 > **New in 0.14.0:** RHC wallet and positions answers report the on-chain check (`holding_status` per position, still held vs transferred, verified value) instead of presenting FIFO-open positions as current holdings; copy-trade rules are typed with `operational_state`.
 
 > **New in 0.10.1 — RHC price-alert copy and types.** RHC price alerts have been event-driven off each `rhc:dex_trade` since 2026-09-15 (price-table polls are the safety net), so the create response's `evaluation` now says `mode: "event_driven"` with `trigger` and `fallback_poll_seconds`; the `RhcPriceAlertCreatedResponse.evaluation` type accepts both `"event_driven"` and the legacy `"polled"`, and the action/plugin descriptions no longer claim a ~15 s poll.
@@ -68,6 +72,7 @@ Gives your ElizaOS agent access to MadeOnSol's Robinhood Chain intelligence API.
 | `GET_RHC_KOL_PROFILE` | `GET /rhc/kol/{wallet}` | BASIC+ |
 | `GET_RHC_KOL_COORDINATION` | `GET /rhc/kol/coordination` | BASIC+ |
 | `GET_RHC_KOL_FIRST_TOUCHES` | `GET /rhc/kol/first-touches` | BASIC+ |
+| `GET_RHC_KOL_SCOUTS` | `GET /rhc/kol/scouts/leaderboard` | PRO+ |
 | `GET_RHC_TRADES` | `GET /rhc/trades` | PRO+ |
 | `GET_RHC_LP_EVENTS` | `GET /rhc/lp-events` — liquidity **removals** only (rug signal) | PRO+ |
 | `GET_RHC_TOKENS` | `GET /rhc/tokens` | PRO+ |
@@ -79,11 +84,15 @@ Gives your ElizaOS agent access to MadeOnSol's Robinhood Chain intelligence API.
 | `GET_RHC_BUYER_QUALITY` | `GET /rhc/tokens/{address}/buyer-quality` | BASIC+ |
 | `GET_RHC_TOKEN_BATCH_BUYER_QUALITY` | `POST /rhc/tokens/batch/buyer-quality` (**max 20**) | BASIC+ |
 | `GET_RHC_TOKEN_BUNDLE` | `GET /rhc/tokens/{address}/bundle` | BASIC+ |
+| `GET_RHC_TOKEN_BUNDLES` | `GET /rhc/tokens/{address}/bundles` — every buy cluster, launch and later | PRO+ |
+| `GET_RHC_TOKEN_BUNDLE_SHARE` | `GET /rhc/tokens/{address}/bundle-share` — null with a reason unless every wallet was read | PRO+ |
+| `GET_RHC_TOKEN_KOL_TRADES` | `GET /rhc/tokens/{address}/kol-trades` (`include_balances` PRO+) | BASIC+ |
 | `GET_RHC_DEPLOYER_LEADERBOARD` | `GET /rhc/deployer-hunter/leaderboard` | BASIC+ |
 | `GET_RHC_DEPLOYER_PROFILE` | `GET /rhc/deployer-hunter/{address}` | BASIC+ |
 | `GET_RHC_DEPLOYER_TRAJECTORY` | `GET /rhc/deployer-hunter/{address}/trajectory` | BASIC+ |
 | `GET_RHC_DEPLOYER_TOKENS` | `GET /rhc/deployer-hunter/{address}/tokens` | BASIC+ |
 | `GET_RHC_DEPLOYER_HISTORY` | `GET /rhc/deployer-hunter/{address}/history` | PRO+ |
+| `GET_RHC_DEPLOYER_ACTIVITY` | `GET /rhc/deployer-hunter/{address}/activity` | PRO+ |
 | `GET_RHC_DEPLOYER_BEST_TOKENS` | `GET /rhc/deployer-hunter/best-tokens` | BASIC+ |
 | `GET_RHC_DEPLOYER_STATS` | `GET /rhc/deployer-hunter/stats` | BASIC+ |
 | `GET_RHC_DEPLOYER_ALERTS` | `GET /rhc/deployer-hunter/alerts` | BASIC+ |
@@ -204,8 +213,8 @@ const lp = await client.getLpEvents({ token: "0x1234567890abcdef1234567890abcdef
 // The rule delivers a SUGGESTED size; it never places an order.
 const rule = await client.createCopytradeSubscription({
   name: "elite RHC wallets",
-  source_wallets: ["0x1234…", "0xabcd…"], // lowercased server-side; must be TRACKED KOL wallets (/rhc/kol/wallets) —
-                                          // untracked ones never fire: see rule.data.subscription.source_wallets_untracked + rule.data.warnings
+  source_wallets: ["0x1234…", "0xabcd…"], // lowercased server-side; any valid 0x wallet, KOL or not (since 2026-10-04):
+                                          // see rule.data.subscription.source_admission + operational_state
   min_trade_eth: 0.05,
   only_action: "buy",
   sizing_mode: "proportional",
@@ -288,3 +297,29 @@ Robinhood Chain coverage is bundled into every tier at no extra cost. BASIC endp
 ## License
 
 MIT
+
+---
+
+## Agent Intelligence Gateway compatibility (coordinated release)
+
+**Scope:** ElizaOS Robinhood Chain plugin — Robinhood Chain.
+
+MadeOnSol's [Agent Intelligence Gateway](https://madeonsol.com/agent-gateway) is
+a separate six-action, read-only research layer: `discover_opportunities`,
+`evaluate_token`, `inspect_wallet`, `inspect_deployer`, `evaluate_signal`,
+and `changes_since`. These actions must not be inferred from a package's
+existing endpoint tools or release number. Follow only an actually published
+package manifest and the [six-tool reference](https://madeonsol.com/agent-gateway/docs).
+
+The plugin's current keyed RHC actions are independent of the upcoming six-action gateway. On a future release, implement only actually supported chain capabilities: tracked KOL/deployer discovery and EVM-native token/wallet evidence are available sources; Solana Signal Scorecard and near-bonded launchpad parity must NOT be advertised as native RHC tools.
+
+**Access models:** a paid subscription authenticates a recurring API client;
+individual x402 calls are available only for exact live priced routes and
+accepted payment legs. MCP/Agent Kit/ElizaOS are tool integration layers, not
+independent billing plans. An account's usage limits and commercial
+redistribution entitlements still apply.
+
+The coordinated release is tracked in the [MadeOnSol source repository](https://github.com/MadeOnSol/madeonsol).
+Do not claim six-tool support from an unpublished local manifest or call a
+not-yet-deployed public Agent Gateway route. Client packages must be published
+and their registry versions synchronized before the site advertises support.
