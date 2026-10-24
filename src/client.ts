@@ -186,6 +186,13 @@ export interface RhcDeployerTierChangedEvent {
     runner_rate: number | null; best_peak_mc_usd: number | null; first_deploy_at: string | null; last_deploy_at: string | null;
   } | null;
   computed_at: string; source: "matview_refresh"; matview: "mv_rhc_deployers";
+  /** Deployer Hunter v2 events only: "v2.0" + where the tier came from + the v2 facts. `stats` stays the deprecated v1 object. */
+  rule_version?: "v2.0"; tier_source?: "rhc_deployer_reputation_v2";
+  stats_v2?: {
+    tokens_deployed: number | null; resolved_launches: number | null; organic_runners: number | null;
+    lifetime_rate: number | null; recent_rate: number | null; manipulation_status: "none" | "suspected" | "manipulated" | null;
+    first_deploy_at: string | null;
+  } | null;
 }
 
 export interface RhcKolFeedResponse {

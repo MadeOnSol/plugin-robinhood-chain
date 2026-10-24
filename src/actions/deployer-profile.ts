@@ -2,6 +2,7 @@ import type { Action, IAgentRuntime, Memory, State, HandlerCallback } from "@eli
 import { RobinhoodChainClient } from "../client.js";
 import { RHC_CLIENT_KEY } from "../index.js";
 import { toContent } from "../content.js";
+import { reputationSummary, reputationDetail } from "./deployer-format.js";
 
 function getClient(runtime: IAgentRuntime): RobinhoodChainClient {
   return ((runtime as unknown as Record<string, unknown>)[RHC_CLIENT_KEY] as RobinhoodChainClient) ?? new RobinhoodChainClient();
@@ -55,8 +56,7 @@ export const rhcDeployerProfileAction: Action = {
     const d = data.deployer;
     const summary = [
       `Robinhood Chain deployer ${address.slice(0, 10)}… [${d.tier}]`,
-      `• ${d.tokens_deployed} tokens deployed, ${d.graduated} graduated, ${d.runners} runners (${(d.runner_rate * 100).toFixed(0)}%)`,
-      `• Best peak MC ${d.best_peak_mc_usd != null ? `$${Number(d.best_peak_mc_usd).toFixed(0)}` : "?"}, launchpads: ${d.launchpads.join(", ") || "?"}`,
+      ...reputationDetail(d),
     ].join("\n");
 
     callback?.({ text: summary, content: toContent(data) });

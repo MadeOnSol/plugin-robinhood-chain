@@ -2,6 +2,7 @@ import type { Action, IAgentRuntime, Memory, State, HandlerCallback } from "@eli
 import { RobinhoodChainClient } from "../client.js";
 import { RHC_CLIENT_KEY } from "../index.js";
 import { toContent } from "../content.js";
+import { reputationSummary, isV2Deployer } from "./deployer-format.js";
 
 function getClient(runtime: IAgentRuntime): RobinhoodChainClient {
   return ((runtime as unknown as Record<string, unknown>)[RHC_CLIENT_KEY] as RobinhoodChainClient) ?? new RobinhoodChainClient();
@@ -57,7 +58,9 @@ export const rhcDeployerHistoryAction: Action = {
     const graduated = data.tokens.filter((t) => t.is_graduated).length;
     const summary = [
       `Robinhood Chain deployer ${address.slice(0, 10)}… [${d.tier}] — ${data.total} tokens deployed`,
-      `• Runner rate ${(d.runner_rate * 100).toFixed(0)}% ($100K+ peaks, ${d.runners}), graduation rate ${(d.graduation_rate * 100).toFixed(0)}% ($40K+ peaks, ${d.graduated})`,
+      isV2Deployer(d)
+        ? `• ${reputationSummary(d)}`
+        : `• Runner rate ${(d.runner_rate * 100).toFixed(0)}% ($100K+ peaks, ${d.runners}), graduation rate ${(d.graduation_rate * 100).toFixed(0)}% ($40K+ peaks, ${d.graduated})`,
       `• This page: ${data.tokens.length} tokens, ${graduated} graduated${data.has_more ? " (more pages available)" : ""}`,
     ].join("\n");
 
